@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS hero_hands (
     cbet TEXT NOT NULL,
     faced_cbet TEXT NOT NULL,
     folded_to_cbet TEXT NOT NULL,
+    check_raise_opportunity TEXT NOT NULL DEFAULT '000',
     check_raise TEXT NOT NULL,
     probe_opportunity TEXT NOT NULL,
     probe TEXT NOT NULL,

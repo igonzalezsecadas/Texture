@@ -343,9 +343,11 @@ pub struct HeroHandAnalysis {
 
     // Postflop, indexed by street in [flop, turn, river] order.
     pub cbet_opportunity: [bool; 3],
-    pub cbet: [bool; 3],
-    pub faced_cbet: [bool; 3],
+    pub cbet: [bool; 3],    pub faced_cbet: [bool; 3],
     pub folded_to_cbet: [bool; 3],
+    /// Hero checked and then faced a bet on this street, which is the only
+    /// situation in which a check-raise is possible.
+    pub check_raise_opportunity: [bool; 3],
     pub check_raise: [bool; 3],
     pub probe_opportunity: [bool; 3],
     pub probe: [bool; 3],

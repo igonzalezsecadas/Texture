@@ -218,7 +218,7 @@ fn insert_hero_analysis(tx: &rusqlite::Transaction<'_>, a: &HeroHandAnalysis) ->
             faced_three_bet, folded_to_three_bet, four_bet, four_bet_opportunity,
             faced_four_bet, folded_to_four_bet, cold_call, cold_call_opportunity,
             steal_attempt, steal_opportunity, faced_steal, folded_to_steal,
-            cbet_opportunity, cbet, faced_cbet, folded_to_cbet, check_raise,
+            cbet_opportunity, cbet, faced_cbet, folded_to_cbet, check_raise_opportunity, check_raise,
             probe_opportunity, probe, delayed_cbet_opportunity, delayed_cbet,
             aggressive_actions, passive_actions
          ) VALUES (
@@ -226,7 +226,7 @@ fn insert_hero_analysis(tx: &rusqlite::Transaction<'_>, a: &HeroHandAnalysis) ->
             ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
             ?19, ?20, ?21, ?22, ?23, ?24, ?25,
             ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36, ?37, ?38, ?39, ?40, ?41,
-            ?42, ?43, ?44, ?45, ?46, ?47, ?48, ?49, ?50, ?51, ?52, ?53, ?54, ?55
+            ?42, ?43, ?44, ?45, ?46, ?47, ?48, ?49, ?50, ?51, ?52, ?53, ?54, ?55, ?56
          )",
         params![
             &a.hand_id,
@@ -277,6 +277,7 @@ fn insert_hero_analysis(tx: &rusqlite::Transaction<'_>, a: &HeroHandAnalysis) ->
             encode_bools(&a.cbet),
             encode_bools(&a.faced_cbet),
             encode_bools(&a.folded_to_cbet),
+            encode_bools(&a.check_raise_opportunity),
             encode_bools(&a.check_raise),
             encode_bools(&a.probe_opportunity),
             encode_bools(&a.probe),
