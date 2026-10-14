@@ -90,6 +90,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn run_import(db: &Db, dir: &std::path::Path, force: bool) -> anyhow::Result<()> {
+    first_run_setup(db, dir, None);
     let opts = importer::ImportOptions { force, quiet: false };
     let start = std::time::Instant::now();
     let mut last_report = std::time::Instant::now();
@@ -120,6 +121,7 @@ fn run_serve(cfg: Config) -> anyhow::Result<()> {
     rt.block_on(async move {
         let bind = cfg.bind_addr;
         let db = Db::open(&cfg.db_path())?;
+        first_run_setup(&db, &cfg.hand_history_dir, cfg.hero_name.clone());
         let (tx, rx) = tokio::sync::watch::channel(false);
 
         let watcher = tokio::spawn(importer::run_watcher(db.clone(), cfg.clone(), rx.clone()));
@@ -144,6 +146,47 @@ fn run_serve(cfg: Config) -> anyhow::Result<()> {
         let _ = tokio::time::timeout(std::time::Duration::from_secs(10), snapshots).await;
         Ok::<_, anyhow::Error>(())
     })
+}
+
+/// First-run identity setup.
+///
+/// Every statistic in this application depends on knowing which seat is the
+/// hero, so the identity is established once, explicitly, and detection is
+/// limited to two honest sources: an explicit `TEXTURE_HERO_NAME`, or the
+/// PokerStars hand-history folder name (which is the hero's screen name with a
+/// numeric account suffix). If neither yields a name, the operator is told to
+/// configure one rather than being given a silently wrong identity.
+fn first_run_setup(db: &Db, hands_dir: &std::path::Path, explicit: Option<String>) {
+    match db.active_profile() {
+        Ok(Some(profile)) => {
+            tracing::info!(profile = %profile.name, "hero profile active");
+            return;
+        }
+        Ok(None) => {}
+        Err(e) => {
+            tracing::error!(error = %e, "could not read the hero profile");
+            return;
+        }
+    }
+    let detected = explicit
+        .filter(|s| !s.trim().is_empty())
+        .or_else(|| importer::detect_hero_name(hands_dir));
+    match detected {
+        Some(name) => match db.ensure_hero_profile(&name) {
+            Ok((profile_id, player_id)) => tracing::info!(
+                hero = %name,
+                profile_id,
+                player_id,
+                "detected the hero from the hand-history folder; set TEXTURE_HERO_NAME to override"
+            ),
+            Err(e) => tracing::error!(hero = %name, error = %e, "could not register the hero"),
+        },
+        None => tracing::warn!(
+            hands = %hands_dir.display(),
+            "no hero identity found; set TEXTURE_HERO_NAME or configure it on the settings screen, 
+             otherwise no statistics will be produced"
+        ),
+    }
 }
 
 fn init_tracing(json: bool) {

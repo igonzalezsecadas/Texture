@@ -196,6 +196,25 @@ impl Db {
             None => Err(StorageError::NotFound("no active hero profile".into())),
         }
     }
+
+    /// `(screen_name, player_id)` for every player in a hero profile. The parser
+    /// deliberately does not know identities, so the import pipeline resolves a
+    /// hand's hero seat through this mapping.
+    pub fn players_for_profile(&self, profile_id: i64) -> Result<Vec<(String, i64)>, StorageError> {
+        self.with_reader(|c| {
+            let mut stmt = c.prepare(
+                "SELECT p.screen_name, p.id
+                 FROM players p
+                 JOIN hero_profile_players hpp ON hpp.player_id = p.id
+                 WHERE hpp.profile_id = ?1
+                 ORDER BY p.screen_name",
+            )?;
+            let rows = stmt
+                .query_map([profile_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
 }
 
 /// Apply the SQLite pragmas every connection needs.
