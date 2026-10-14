@@ -59,10 +59,10 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# The binary (bundled SQLite, no runtime SQLite dependency).
+# The binary (bundled SQLite, no runtime SQLite dependency). Templates, CSS and
+# the charting library are all embedded in the binary with include_str!, so
+# nothing else needs to be copied: there is no runtime asset path to get wrong.
 COPY --from=build /app/target/release/texture /usr/local/bin/texture
-# Runtime assets: templates loaded from disk by the web layer (if any).
-COPY --from=build /app/templates /app/templates
 
 # Data and hand-history directories. In practice these are bind-mounted from
 # the host (see compose.yaml); the mkdir only makes bare `docker run` useful.
