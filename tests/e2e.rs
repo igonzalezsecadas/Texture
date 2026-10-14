@@ -146,7 +146,7 @@ fn v1_acceptance_path() {
     with_bad.push(walk_hand(7));
     write_hands(hands_dir.path(), "2024-01-02.txt", &with_bad);
     let mut progress = noop_progress();
-    let sixth = importer::import_directory(&db, hands_dir.path(), &opts, &mut progress)
+    let _sixth = importer::import_directory(&db, hands_dir.path(), &opts, &mut progress)
         .expect("import with a bad hand succeeds");
     assert_eq!(
         storage::hands::hand_count_total(&db).expect("count"),

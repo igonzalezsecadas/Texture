@@ -192,7 +192,8 @@ pub fn upsert_hand(
         }
 
         tx.execute(
-            "INSERT INTO raw_hands(hand_id, raw_text) VALUES (?1, ?2)",
+            "INSERT INTO raw_hands(hand_id, raw_text) VALUES (?1, ?2)
+             ON CONFLICT(hand_id) DO UPDATE SET raw_text = excluded.raw_text",
             params![&parsed.hand_id, raw],
         )?;
 
