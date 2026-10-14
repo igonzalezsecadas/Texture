@@ -54,11 +54,38 @@ throwaway databases.
 ## Quick start (Docker)
 
 ```sh
-mkdir -p hands data
+mkdir -p hands data          # create these YOURSELF, before the first `up`
 # copy or point your PokerStars hand histories at ./hands
 docker compose up -d --build
 # UI: http://127.0.0.1:8080
 ```
+
+**Create `hands/` and `data/` yourself, as your own user.** If they do not exist
+when compose first runs, Docker creates them **owned by root**, and then the
+container's unprivileged user cannot write the database. The symptom is:
+
+```
+Error: database error: unable to open database file: /data/texture.sqlite
+```
+
+If you hit that, the directory just needs to be owned by the user the container
+runs as:
+
+```sh
+sudo chown -R "$(id -u):$(id -g)" data hands
+```
+
+`compose.yaml` runs the container as `${TEXTURE_UID:-1000}:${TEXTURE_GID:-1000}`
+so the bind mounts match a typical first user without any `chown`. If your uid is
+not 1000, either set it explicitly:
+
+```sh
+TEXTURE_UID=$(id -u) TEXTURE_GID=$(id -g) docker compose up -d
+```
+
+or `chown` the two directories to the image's user (1000:1000). The application
+now probes the data directory at startup and prints this fix instead of SQLite's
+bare `unable to open database file`.
 
 What this gives you:
 

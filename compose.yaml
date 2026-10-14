@@ -18,6 +18,12 @@ services:
     container_name: texture
     restart: unless-stopped
 
+    # Run as the host user, so the bind mounts below are writable without any
+    # chown. The image's own user is uid 1000, which is why the defaults match a
+    # typical first user; override if yours differs:
+    #   TEXTURE_UID=$(id -u) TEXTURE_GID=$(id -g) docker compose up -d
+    user: "${TEXTURE_UID:-1000}:${TEXTURE_GID:-1000}"
+
     # Publish on the loopback interface only. The UI has no authentication,
     # TLS, or session layer by design — it must never be reachable from the
     # network. Note that inside the container the process must bind to
@@ -28,9 +34,12 @@ services:
       - "127.0.0.1:8080:8080"
 
     volumes:
-      # Hand histories: read-only, by design.
+      # Hand histories: read-only, by design. Must be readable by the uid above.
       - ./hands:/hands:ro
-      # Database + snapshots: read-write.
+      # Database + snapshots: read-write. Must be WRITABLE by the uid above; if
+      # Docker created this directory for you it is owned by root, and the
+      # database cannot be opened. Fix on the host with:
+      #   sudo chown -R "$(id -u):$(id -g)" data
       - ./data:/data
 
     environment:

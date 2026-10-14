@@ -31,8 +31,18 @@ impl Db {
     /// Open (creating if needed) the database at `path`, apply migrations, and
     /// set pragmas.
     pub fn open(path: &Path) -> Result<Db, StorageError> {
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent)
+                .map_err(|source| StorageError::DataDirUnwritable { path: parent.to_path_buf(), source })?;
+            // Probe writability before handing the path to SQLite. This turns the
+            // most common container misconfiguration (a root-owned host bind
+            // mount) from `unable to open database file` into an instruction.
+            let probe = parent.join(".texture-write-probe");
+            std::fs::write(&probe, b"").map_err(|source| StorageError::DataDirUnwritable {
+                path: parent.to_path_buf(),
+                source,
+            })?;
+            let _ = std::fs::remove_file(&probe);
         }
         let mut conn = Connection::open_with_flags(
             path,
@@ -284,7 +294,53 @@ pub mod tempdir {
 
     impl Drop for TempDir {
         fn drop(&mut self) {
+            // A test may have made this directory read-only; make it removable.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&self.path, std::fs::Permissions::from_mode(0o755));
+            }
             let _ = std::fs::remove_dir_all(&self.path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn an_unwritable_data_directory_reports_an_actionable_error() {
+        let dir = tempdir::TempDir::new("texture-ro").expect("temp dir");
+        let read_only = dir.path().join("ro");
+        std::fs::create_dir(&read_only).expect("mkdir");
+        let mut perms = std::fs::metadata(&read_only).expect("stat").permissions();
+        perms.set_mode(0o555);
+        std::fs::set_permissions(&read_only, perms).expect("chmod");
+
+        // Running as root ignores file permissions, so there is nothing to test.
+        if std::fs::write(read_only.join("probe"), b"").is_ok() {
+            let _ = std::fs::remove_file(read_only.join("probe"));
+            return;
+        }
+
+        let error = Db::open(&read_only.join("texture.sqlite"))
+            .err()
+            .expect("opening in a read-only directory must fail");
+        let message = error.to_string();
+        assert!(
+            message.contains("not writable"),
+            "the error must name the problem, got: {message}"
+        );
+        assert!(
+            message.contains("chown"),
+            "the error must tell the operator how to fix it, got: {message}"
+        );
+        assert!(
+            message.contains("1000:1000"),
+            "the error must give the concrete container fix, got: {message}"
+        );
     }
 }

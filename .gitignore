@@ -3,3 +3,7 @@ target/
 *.sqlite
 *.sqlite-*
 .env
+
+# Personal hand histories and the local database never belong in the repo.
+/hands/
+/data/
