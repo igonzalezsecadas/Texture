@@ -4,7 +4,7 @@
 //! is to turn raw hand text into a [`ParsedHand`]. Everything downstream consumes
 //! [`ParsedHand`], [`HeroHandAnalysis`], and [`FilterSpec`].
 
-use crate::money::{Currency, Money};
+pub use crate::money::{Currency, Money};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -74,12 +74,16 @@ impl Street {
 }
 
 /// A table position, ordered from the worst seat (small blind) to the best (button).
+///
+/// Labels follow PokerTracker 4's defaults so positional reports can be read
+/// side by side: 9-max uses UTG/UTG1/UTG2/MP/HJ/CO, 6-max uses UTG/MP/CO.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Position {
     Sb,
     Bb,
     Utg,
     Utg1,
+    Utg2,
     Mp,
     Hj,
     Co,
@@ -87,11 +91,12 @@ pub enum Position {
 }
 
 impl Position {
-    pub const ALL: [Position; 8] = [
+    pub const ALL: [Position; 9] = [
         Position::Sb,
         Position::Bb,
         Position::Utg,
         Position::Utg1,
+        Position::Utg2,
         Position::Mp,
         Position::Hj,
         Position::Co,
@@ -104,10 +109,33 @@ impl Position {
             Position::Bb => "BB",
             Position::Utg => "UTG",
             Position::Utg1 => "UTG1",
+            Position::Utg2 => "UTG2",
             Position::Mp => "MP",
             Position::Hj => "HJ",
             Position::Co => "CO",
             Position::Btn => "BTN",
+        }
+    }
+
+    /// The seats between the big blind and the button, in preflop acting order,
+    /// for a table with `n` dealt-in players. These are the only labels that move
+    /// when the table size changes; SB, BB and BTN are fixed.
+    pub fn middle_sequence(n: usize) -> &'static [Position] {
+        match n {
+            0..=3 => &[],
+            4 => &[Position::Co],
+            5 => &[Position::Mp, Position::Co],
+            6 => &[Position::Utg, Position::Mp, Position::Co],
+            7 => &[Position::Utg, Position::Utg1, Position::Mp, Position::Co],
+            8 => &[Position::Utg, Position::Utg1, Position::Utg2, Position::Mp, Position::Co],
+            _ => &[
+                Position::Utg,
+                Position::Utg1,
+                Position::Utg2,
+                Position::Mp,
+                Position::Hj,
+                Position::Co,
+            ],
         }
     }
 
