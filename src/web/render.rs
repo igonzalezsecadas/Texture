@@ -26,7 +26,11 @@ pub fn env() -> &'static Environment<'static> {
     static ENV: OnceLock<Environment<'static>> = OnceLock::new();
     ENV.get_or_init(|| {
         let mut env = Environment::new();
-        let register = |env: &mut Environment<'static>, name: &str, src: &'static str| {
+        // Hand text, screen names and table names are user data, so `.html`
+        // templates are escaped by default. `|safe` opts out for the chart
+        // payload, which is JSON inside a script tag.
+        env.set_auto_escape_callback(minijinja::default_auto_escape_callback);
+        let register = |env: &mut Environment<'static>, name: &'static str, src: &'static str| {
             env.add_template(name, src)
                 .unwrap_or_else(|e| panic!("invalid template {name}: {e}"));
         };
@@ -129,4 +133,26 @@ fn dur(secs: i64) -> String {
 
 fn usize_of(v: Value) -> Value {
     Value::from(v.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Public formatting helpers for view models
+// ---------------------------------------------------------------------------
+//
+// The view models pre-format their numbers so a template never sees a raw float
+// for money, and never has to know the currency exponent.
+
+/// `12.3%`, or an em dash when the denominator is zero (stat undefined).
+pub fn pct_str(numerator: i64, denominator: i64) -> String {
+    pct(numerator, denominator)
+}
+
+/// Human duration in seconds; the UI labels session durations as approximate.
+pub fn dur_str(secs: i64) -> String {
+    dur(secs)
+}
+
+/// Unix seconds to a UTC timestamp.
+pub fn dt_str(ts: i64) -> String {
+    dt(ts)
 }

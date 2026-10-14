@@ -1,0 +1,25 @@
+{% include "filter_bar.html" %}
+<h1>Position</h1>
+<p class="muted">Every statistic broken down by seat. Action: {{ groupName }}</p>
+<table class="stats">
+  <thead>
+    <tr>
+      <th>Position</th>
+      {% for c in columns %}<th><abbr class="def" title="{{ c.definition }}">{{ c.label }}</abbr></th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <th scope="row">{{ r.label }}</th>
+      <td>{{ r.hands }}</td>
+      <td class="{% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
+      <td>{{ r.bb_per_100 }}</td>
+      <td>{{ r.vpip }}</td>
+      <td>{{ r.pfr }}</td>
+      <td>{{ r.wtsd }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if not rows %}<p class="empty">No hands match these filters.</p>{% endif %}

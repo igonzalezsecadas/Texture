@@ -16,11 +16,40 @@ compares headline aggregates within a stated tolerance (see
 
 **Docker is NOT installed on the machine this project was developed on.** The
 native-binary path (`cargo build --release` + run the binary directly) is
-verified: the binary builds and the CLI works. The Dockerfile and
-`compose.yaml` are written to the spec and sanity-checked by inspection, but
-have **not been executed**. Treat the first `docker compose up --build` as the
-real test; if something breaks, it is a bug report against this packaging, not
-a mystery.
+verified end to end. The Dockerfile and `compose.yaml` are written to the spec
+and sanity-checked by inspection, but have **not been executed**. Treat the
+first `docker compose up --build` as the real test; if something breaks, it is
+a bug report against this packaging, not a mystery.
+
+### What the native path was verified to do
+
+Run against a real database with real imported hands:
+
+- `import` backfilled a hand-history directory: `2 files, 4 hands, 0 duplicates,
+  0 quarantined, 0 failures`.
+- `serve` bound localhost, and `/healthz` returned
+  `{"hands":4,"quarantined":0,"status":"ok","version":"0.1.0"}`.
+- The dashboard reported real numbers, including the all-in adjustment: total won
+  `€59.00`, all-in adjusted `€41.87`, luck delta `+€17.13` — the AA-vs-KK preflop
+  all-in being adjusted for equity.
+- **Continuous import**: appending a hand to a watched file was picked up
+automatically (hand count went 4 → 5 within seconds) while the dashboard kept
+  responding in ~7 ms.
+- **Filters**: a filtered request returned a different population than the
+  unfiltered one, and the active filter set was visible and clearable.
+- **Export**: `/export/aggregate.csv` produced machine-readable decimals (no
+  digit grouping), and `/export/hands.csv` carried the original hand text.
+- **Snapshot and restore**: an automatic snapshot was taken on start, and the
+  snapshot reopened as a database with matching `hands`, `hero_hands` and
+  `raw_hands` counts.
+- **Reparse**: `reparse --force` rebuilt all 5 hands from the retained raw text in
+  ~0.6 s, and the reports were unchanged afterwards — the compatibility
+  guarantee that raw text is the source of truth.
+- **Shutdown**: `SIGTERM` stopped the process cleanly.
+
+All of this is also covered by the test suite (`cargo test`, 115 tests), which
+runs the real parser, the real storage layer and the real router against
+throwaway databases.
 
 ## Quick start (Docker)
 

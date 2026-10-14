@@ -1,6 +1,6 @@
 # 03 — Import pipeline (bulk + watcher)
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01, 02
 

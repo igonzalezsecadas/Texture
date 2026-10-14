@@ -2,13 +2,14 @@
 //! swaps the `#content` fragment for filter changes, and every screen renders
 //! identically on a full page load (no JavaScript required).
 
-use crate::config::Config;
 use crate::domain::{
     ActionKind, Currency, FilterSpec, GroupBy, HeroProfile, Position, Session, Street,
 };
 use crate::money::Money;
 use crate::storage::Db;
+use crate::parser::{self, HandParser};
 use crate::storage::hands as hands_store;
+use rusqlite::OptionalExtension;
 use crate::storage::queries as q;
 use crate::web::defs;
 use crate::web::filters::{group_param, FilterView};
@@ -18,7 +19,6 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use super::AppState;
 
@@ -31,7 +31,7 @@ const HANDS_PER_PAGE: i64 = 50;
 const QUARANTINE_PAGE: i64 = 100;
 
 pub type WebResult<T> = Result<T, WebError>;
-pub struct WebError(StatusCode, String);
+pub struct WebError(pub StatusCode, pub String);
 
 impl From<(StatusCode, String)> for WebError {
     fn from(v: (StatusCode, String)) -> Self {
@@ -53,7 +53,7 @@ fn not_found(what: &str) -> WebError {
     WebError(StatusCode::NOT_FOUND, format!("{what} not found"))
 }
 
-fn screen_value(name: &str, obj: serde_json::Value, fragment: bool) -> Response {
+fn screen_value(name: &str, obj: impl Serialize, fragment: bool) -> Response {
     let env = env();
     let value = minijinja::Value::from_serialize(&obj);
     let template = if fragment { name } else { "layout.html" };
@@ -204,15 +204,6 @@ fn queries_safe_stakes(db: &Db) -> Vec<(i64, i64, String)> {
     q::stake_options(db).unwrap_or_default()
 }
 
-#[derive(Serialize)]
-struct SummaryView {
-    hands: i64,
-    #[serde(rename = "totalWonTimeline")]
-    _phantom: Option<String>,
-    #[serde(skip_serializing)]
-    _unused: Option<String>,
-}
-
 // (SummaryView below supersedes the placeholder above; remove both.)
 #[derive(Serialize)]
 struct Summary {
@@ -315,7 +306,7 @@ fn summary_from(row: q::AggregateRow, stake_bb: Option<f64>) -> Summary {
     Summary {
         has_data: row.hands > 0,
         hands: row.hands,
-        net: row.net_result_minor.money(),
+        net: money_of(row.net_result_minor),
         positive: row.net_result_minor >= 0,
         bb_per_100: format!("{:.2}", row.bb_per_100),
         // `currency_per_100` is minor units; the exponent division happens at
@@ -323,7 +314,7 @@ fn summary_from(row: q::AggregateRow, stake_bb: Option<f64>) -> Summary {
         // convention — here formatted directly from minor units.
         currency_per_100: Money::new(row.currency_per_100.round() as i64, Currency::Eur)
             .format(),
-        adjusted: row.adjusted_result_minor.money(),
+        adjusted: money_of(row.adjusted_result_minor),
         luck: {
             let m = Money::new(row.luck_delta_minor.abs(), Currency::Eur).format();
             if luck_zero {
@@ -341,19 +332,13 @@ fn summary_from(row: q::AggregateRow, stake_bb: Option<f64>) -> Summary {
         } else {
             "bad"
         },
-        showdown: row.sd_winnings_minor.money(),
-        non_showdown: row.non_sd_winnings_minor.money(),
-        rake: row.rake_attributed_minor.money(),
+        showdown: money_of(row.sd_winnings_minor),
+        non_showdown: money_of(row.non_sd_winnings_minor),
+        rake: money_of(row.rake_attributed_minor),
         // Rake in big blinds is Σ rake_i / bb_i; `AggregateRow` does not carry
         // the per-hand normalization, so it is rebuilt from the stake-grouped
         // aggregate (labels match `stake_options`) with per-stake big blinds.
         rake_bb: stake_bb.map(|v| format!("{v:.1} BB")),
-    }
-}
-
-impl Money {
-    fn money(self) -> String {
-        self.format()
     }
 }
 
@@ -367,8 +352,8 @@ fn stake_group_rake_bb(db: &Db, spec: &FilterSpec) -> Option<f64> {
         return None;
     }
     let options = q::stake_options(db).ok()?;
-    let bb_of: HashMap<&str, i64> =
-        options.into_iter().map(|(sb, bb, label)| (label.as_str(), bb.min(sb).max(bb))).collect();
+    let bb_of: HashMap<String, i64> =
+        options.into_iter().map(|(sb, bb, label)| (label, bb.min(sb).max(bb))).collect();
     let mut sum = 0.0;
     let mut any = false;
     for g in &groups {
@@ -394,17 +379,6 @@ fn stat(name: &str, num: i64, den: i64, dict_key: &str) -> StatRow {
     }
 }
 
-fn ratio_stat(name: &str, num: i64, den: i64, dict_key: &str) -> StatRow {
-    // Aggression factor / frequency style: ratio or percent pre-formatted by
-    // the caller through `value`.
-    let _ = (num, den);
-    StatRow {
-        name: name.to_string(),
-        value: String::new(),
-        counts: String::new(),
-        definition: defs::definition(dict_key),
-    }
-}
 
 #[allow(dead_code)]
 fn unused(_: ()) {}
@@ -523,7 +497,7 @@ fn postflop_rows(row: &q::AggregateRow) -> Vec<StatRow> {
             "Check-Raise (by street)",
         ));
     }
-    for (i, s) in [("Turn", 1usize), ("River", 2usize)] {
+    for (s, i) in [("Turn", 1usize), ("River", 2usize)] {
         rows.push(stat(
             &format!("Probe bet {s}"),
             row.probe[i],
@@ -591,39 +565,9 @@ fn stat_groups(
     Ok(out)
 }
 
-async fn stat_screen(
-    st: &AppState,
-    raw: Option<&str>,
-    path: &'static str,
-    title: &'static str,
-    active: &'static str,
-    screen: &'static str,
-    rows_of: impl Fn(&q::AggregateRow) -> Vec<StatRow>,
-) -> WebResult<Response> {
-    let fv = FilterView::parse(raw);
-    let bar = FilterBar::build(st, &fv, path, true);
-    let groups = stat_groups(&st.db, &fv.spec, group_param(&fv), rows_of)?;
-    let mut obj = base_json(title, path, active, screen, &bar);
-    let obj = obj.as_object_mut().ok_or_else(|| internal("base object"))?;
-    obj.insert(
-        "groups".into(),
-        serde_json::to_value(&groups).map_err(|e| internal(e))?,
-    );
-    obj.insert(
-        "groupName".into(),
-        serde_json::Value::String(
-            fv.group.clone().unwrap_or_else(|| "none".into()),
-        ),
-    );
-    Ok(screen_value(screen, obj.clone(), wants_fragment(&st_headers_dummy())))
-    // note: the real header check is done by the caller below
-}
 
 // `stat_screen` needs the htmx header, which only the real handlers see; the
 // `_dummy` trick below is deliberately replaced by the thin per-route handlers.
-fn st_headers_dummy() -> HeaderMap {
-    HeaderMap::new()
-}
 
 pub async fn preflop(
     State(st): State<AppState>,
@@ -753,8 +697,8 @@ pub async fn sessions(
                 // approximate (story 71).
                 duration: format!("≈ {}", crate::web::render::dur_str(duration)),
                 hands: s.hands,
-                net: money_of(s.net_result.minor),
-                positive: s.net_result.minor >= 0,
+                net: money_of(s.net_result),
+                positive: s.net_result >= 0,
             }
         })
         .collect();
@@ -824,7 +768,7 @@ pub async fn hands(
         format!("{path}?{q}", path = "/hands")
     };
     let prev = (page > 1).then(|| urls(page - 1));
-    let next = (page as i64 < pages).then(|| urls(page + 1));
+    let next = ((page as i64) < pages).then(|| urls(page + 1));
     let links = PageLinks {
         prev,
         next,
@@ -860,8 +804,20 @@ pub async fn hands(
     Ok(screen_value("hands.html", obj.clone(), wants_fragment(&headers)))
 }
 
+/// Percent-encode a query parameter value. Only the characters that can appear
+/// in the filter values (screen names, stake labels, dates) matter here.
 fn urlencode(s: &str) -> String {
-    crate::web::filters::encode_pub(s)
+    let mut out = String::with_capacity(s.len());
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char)
+            }
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
 }
 
 #[derive(Serialize)]
@@ -909,11 +865,9 @@ struct HandDetail {
 
 pub async fn hand_detail(
     State(st): State<AppState>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     Path(hand_id): Path<String>,
 ) -> WebResult<Response> {
-    use crate::parser;
-
     // The parsed header and seats are read from the stored rows; the full
     // action list is not persisted (raw text makes it recoverable), so the
     // hand detail view re-parses the retained raw text for display only.
@@ -1065,7 +1019,7 @@ fn db_in_session(state: &AppState, hand_id: &str) -> WebResult<Response> {
         "hand_detail.html",
         &bar,
     );
-    let obj = obj.as_object_mut().map_err(|_| internal("base object"))?;
+    let obj = obj.as_object_mut().ok_or_else(|| internal("base object"))?;
     obj.insert(
         "hand".into(),
         serde_json::to_value(&detail).map_err(|e| internal(e))?,
@@ -1259,73 +1213,21 @@ pub async fn retry_quarantine(
 }
 
 fn retry_parse_and_store(db: &Db, source_file: &str, raw_text: &str) -> Result<(), String> {
-    use crate::parser;
     let parsed = parser::default_parser().parse_hand(raw_text).map_err(|e| e.to_string())?;
 
-    // Mirror the importer's hero resolution; `analyze_hand` failing to land
-    // yet is absorbed so the hand itself is still recovered.
-    let hero = db
-        .active_player_ids()
-        .ok()
-        .map(|(profile_id, ids)| (profile_id, ids));
-    let analysis = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        hero.as_ref().and_then(|(profile_id, ids)| {
-            ids.iter().find_map(|pid| {
-                parsed
-                    .seats
-                    .iter()
-                    .find(|s| ids.iter().any(|_| false) || false)
-                    .map(|_| ())
-                    .and_then(|_| None::<crate::domain::HeroHandAnalysis>)
-                    .or_else(|| crate::stats::analyze_hand(&parsed, *profile_id, *pid))
-            })
-        })
-    }))
-    .ok()
-    .flatten();
-    // The `find_map` above resolves the hero seat by player id mapping; the
-    // importer does the seat-name matching for us, so reuse its semantics via
-    // profile players when available.
-    let analysis = match analysis {
-        Some(a) => Some(a),
-        None => hero.as_ref().and_then(|(profile_id, ids)| {
-            let names: Result<Vec<String>, _> = Ok::<Vec<String>, ()>(
-                db.players_for_profile(*profile_id)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|(name, _)| name)
-                    .collect(),
-            );
-            let _ = names;
-            ids.first().and_then(|pid| {
-                let _ = pid;
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    parsed.seats.iter().find_map(|seat| {
-                        db.players_for_profile(*profile_id).ok()?.iter().find_map(
-                            |(name, _pid)| {
-                                if name == &seat.screen_name {
-                                    crate::stats::analyze_hand(&parsed, *profile_id, *_pid)
-                                } else {
-                                    None
-                                }
-                            },
-                        )
-                    })
-                }))
-                .ok()
-                .flatten()
-            })
-        }),
+    // Use exactly the importer's hero resolution, so a retried hand produces the
+    // same analysis row it would have produced on a normal import. Identity is
+    // resolved through storage, never inside the derivation.
+    let analysis = match db.active_profile().ok().flatten() {
+        Some(profile) => {
+            let players = db.players_for_profile(profile.id).unwrap_or_default();
+            crate::stats::analyze_hero(&parsed, profile.id, &players)
+        }
+        None => None,
     };
 
-    hands_store::upsert_hand(
-        db,
-        &parsed,
-        analysis.as_ref(),
-        raw_text,
-        source_file,
-    )
-    .map_err(|e| e.to_string())?;
+    hands_store::upsert_hand(db, &parsed, analysis.as_ref(), raw_text, source_file)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -1501,15 +1403,16 @@ pub async fn export_aggregate_csv(
     .map_err(internal)?;
     for g in &groups {
         let r = &g.row;
-        // `currency_per_100` is minor units; round to whole minor units and
-        // format via Money (exponent division at display time only).
-        let per100 = Money::new(r.currency_per_100.round() as i64, Currency::Eur).format_plain();
+        // `currency_per_100` is minor units; the exponent division happens only
+        // at presentation. CSV gets a machine-readable decimal with no digit
+        // grouping, so the file can be consumed as numbers.
+        let per100 = Money::new(r.currency_per_100.round() as i64, Currency::Eur).format_machine();
         w.write_record([
             g.label.as_str(),
             &r.hands.to_string(),
-            &Money::new(r.net_result_minor, Currency::Eur).format_plain(),
-            &Money::new(r.adjusted_result_minor, Currency::Eur).format_plain(),
-            &Money::new(r.rake_attributed_minor, Currency::Eur).format_plain(),
+            &Money::new(r.net_result_minor, Currency::Eur).format_machine(),
+            &Money::new(r.adjusted_result_minor, Currency::Eur).format_machine(),
+            &Money::new(r.rake_attributed_minor, Currency::Eur).format_machine(),
             &format!("{:.2}", r.bb_won),
             &format!("{:.2}", r.bb_per_100),
             &per100,

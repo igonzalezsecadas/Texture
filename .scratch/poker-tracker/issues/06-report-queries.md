@@ -1,6 +1,6 @@
 # 06 — Report queries
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 02, 05
 

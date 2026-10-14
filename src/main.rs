@@ -58,7 +58,7 @@ fn main() -> anyhow::Result<()> {
         Command::Import { path, force } => {
             let dir = path.unwrap_or_else(|| cfg.hand_history_dir.clone());
             let db = Db::open(&cfg.db_path())?;
-            run_import(&db, &dir, force)
+            run_import(&db, &dir, force, cfg.hero_name.clone())
         }
         Command::Reparse { force } => {
             let db = Db::open(&cfg.db_path())?;
@@ -89,8 +89,8 @@ fn main() -> anyhow::Result<()> {
     }
 }
 
-fn run_import(db: &Db, dir: &std::path::Path, force: bool) -> anyhow::Result<()> {
-    first_run_setup(db, dir, None);
+fn run_import(db: &Db, dir: &std::path::Path, force: bool, explicit_hero: Option<String>) -> anyhow::Result<()> {
+    first_run_setup(db, dir, explicit_hero);
     let opts = importer::ImportOptions { force, quiet: false };
     let start = std::time::Instant::now();
     let mut last_report = std::time::Instant::now();

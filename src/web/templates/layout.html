@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} · texture</title>
+<link rel="stylesheet" href="/static/uPlot.min.css">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">texture</a>
+  <nav>
+    <a href="/" {% if active == "dashboard" %}class="on"{% endif %}>Dashboard</a>
+    <a href="/preflop" {% if active == "preflop" %}class="on"{% endif %}>Preflop</a>
+    <a href="/postflop" {% if active == "postflop" %}class="on"{% endif %}>Postflop</a>
+    <a href="/position" {% if active == "position" %}class="on"{% endif %}>Position</a>
+    <a href="/sessions" {% if active == "sessions" %}class="on"{% endif %}>Sessions</a>
+    <a href="/hands" {% if active == "hands" %}class="on"{% endif %}>Hands</a>
+    <a href="/import" {% if active == "import" %}class="on"{% endif %}>Import</a>
+    <a href="/settings" {% if active == "settings" %}class="on"{% endif %}>Settings</a>
+  </nav>
+  <span class="version" title="statistics definitions follow PokerTracker 4 semantics">v{{ version }}</span>
+</header>
+<main id="content">
+{% include screen %}
+</main>
+<footer>
+  <p>Local-only. Every statistic above carries its definition: hover a name.</p>
+</footer>
+<script src="/static/uPlot.iife.min.js" defer></script>
+<script src="/static/app.js" defer></script>
+</body>
+</html>

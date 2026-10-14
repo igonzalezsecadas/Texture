@@ -1,6 +1,6 @@
 # 07 — Web UI
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 06
 

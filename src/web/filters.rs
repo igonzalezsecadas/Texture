@@ -289,8 +289,9 @@ fn encode(s: &str) -> String {
 /// `from` is an inclusive UTC midnight.
 fn parse_date_inclusive(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
     let d = chrono::NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d").ok()?;
+    use chrono::{Datelike, TimeZone};
     Some(
-        chrono::TimeZone::from(&chrono::Utc)
+        chrono::Utc
             .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
             .single()?,
     )

@@ -1,6 +1,6 @@
 # 05 — Statistics derivation and sessions
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: 01 (types only), 04
 

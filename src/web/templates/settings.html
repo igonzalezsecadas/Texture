@@ -1,0 +1,37 @@
+<h1>Settings</h1>
+<h2>Hero identity</h2>
+<p class="muted">Every statistic depends on knowing which seat is you. Screen names can be
+aliased into one profile so lifetime results survive a rename.</p>
+<table class="stats">
+  <thead><tr><th>Profile</th><th>Screen names</th><th>Active</th><th></th></tr></thead>
+  <tbody>
+  {% for p in profiles %}
+    <tr>
+      <td>{{ p.name }}</td>
+      <td>{{ p.players|join(", ") }}</td>
+      <td>{% if p.active %}yes{% else %}no{% endif %}</td>
+      <td>
+        {% if not p.active %}<form method="post" action="/settings/profiles/{{ p.id }}/activate"><button type="submit">Make active</button></form>{% endif %}
+        <form method="post" action="/settings/profiles/{{ p.id }}/players">
+          <input type="text" name="screen_name" placeholder="screen name">
+          <button type="submit">Add alias</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form method="post" action="/settings/profiles">
+  <input type="text" name="name" placeholder="new profile name">
+  <button type="submit">Create profile</button>
+</form>
+<h2>Sessions</h2>
+<form method="post" action="/settings/session-gap">
+  <label>Idle gap before a new session, in minutes
+    <input type="number" name="gap_minutes" min="1" value="{{ gapMinutes }}"></label>
+  <button type="submit">Save</button>
+</form>
+<h2>Backups</h2>
+<p class="muted">Snapshots are taken automatically and written to <code>{{ snapshotDir }}</code>.
+Take one now before an upgrade.</p>
+<form method="post" action="/settings/snapshot"><button type="submit">Take a snapshot now</button></form>

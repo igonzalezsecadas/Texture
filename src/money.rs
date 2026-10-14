@@ -97,6 +97,26 @@ impl Money {
         format_amount(self.minor, "", self.currency.exponent())
     }
 
+    /// Machine-readable decimal for CSV export: no currency symbol and no digit
+    /// grouping, so a spreadsheet or script can parse it as a number. Exact,
+    /// because the minor units are only divided by the currency exponent.
+    pub fn format_machine(self) -> String {
+        let negative = self.minor < 0;
+        let magnitude = self.minor.unsigned_abs();
+        let exponent = self.currency.exponent();
+        let sign = if negative { "-" } else { "" };
+        if exponent == 0 {
+            return format!("{sign}{magnitude}");
+        }
+        let scale = 10u64.pow(exponent);
+        format!(
+            "{sign}{}.{:0width$}",
+            magnitude / scale,
+            magnitude % scale,
+            width = exponent as usize
+        )
+    }
+
     /// Parse a decimal amount as written in a hand history, e.g. `"12.34"`,
     /// `"1,234.5"`, `"$0.25"`. Returns minor units.
     pub fn parse_minor(text: &str, currency: Currency) -> Option<i64> {

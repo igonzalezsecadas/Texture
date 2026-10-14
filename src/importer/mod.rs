@@ -488,11 +488,19 @@ pub fn reparse(
 }
 
 /// Detect the hero's screen name from a PokerStars hand-history folder name.
-/// PokerStars folder names look like `hero.name12345`, so the screen name is the
-/// folder name up to the numeric account suffix.
+///
+/// PokerStars names the per-account folder `<screen name><account number>`, for
+/// example `hero.name12345`. Detection therefore requires a trailing numeric
+/// account suffix: a generic folder such as `hands` or `HandHistory` yields
+/// `None`, because guessing an identity there would silently attribute every
+/// statistic to a player who does not exist.
 pub fn detect_hero_name(dir: &Path) -> Option<String> {
     let name = dir.file_name()?.to_str()?;
     let trimmed = name.trim_end_matches(|c: char| c.is_ascii_digit());
+    if trimmed.len() == name.len() {
+        // No account suffix: not a PokerStars account folder.
+        return None;
+    }
     let trimmed = trimmed.trim_end_matches('.');
     if trimmed.is_empty() {
         None

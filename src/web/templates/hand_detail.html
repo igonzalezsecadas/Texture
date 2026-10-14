@@ -1,0 +1,44 @@
+<p class="crumbs"><a href="/hands">&larr; back to hands</a></p>
+<h1>Hand {{ hand.hand_id }}</h1>
+<p class="muted">{{ hand.table_name }} &middot; {{ hand.stakes }} &middot; {{ hand.table_size }}-max
+  &middot; {{ hand.ts }} ({{ hand.local_ts }} {{ hand.tz_token }})
+  &middot; parser v{{ hand.parser_version }}</p>
+<div class="split">
+  <section class="parsed">
+    <h2>Parsed</h2>
+    <p><strong>Board:</strong> {{ hand.board }}</p>
+    <p><strong>Pot:</strong> {{ hand.pot }} &middot; <strong>Rake:</strong> {{ hand.rake }}
+      &middot; showdown: {{ "yes" if hand.went_to_showdown else "no" }}</p>
+    <table class="stats">
+      <thead><tr><th>Seat</th><th>Player</th><th>Stack</th><th>Pos</th><th>Put in</th><th>Result</th><th>Cards</th></tr></thead>
+      <tbody>
+      {% for s in hand.seats %}
+        <tr>
+          <td>{{ s.seat }}</td><td>{{ s.name }}</td><td>{{ s.stack }}</td><td>{{ s.position }}</td>
+          <td>{{ s.contributed }}</td>
+          <td class="{% if s.positive %}pos{% else %}neg{% endif %}">{{ s.result }}</td>
+          <td>{{ s.cards }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <h2>Actions</h2>
+    {% if hand.actionsAvailable %}
+    <table class="stats">
+      <thead><tr><th>Street</th><th>Player</th><th>Action</th><th>Amount</th></tr></thead>
+      <tbody>
+      {% for a in hand.actions %}
+        <tr><td>{{ a.street }}</td><td>{{ a.who }}</td><td>{{ a.kind }}</td><td>{{ a.amount }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">{{ hand.actionsNote }}</p>
+    {% endif %}
+  </section>
+  <section class="raw">
+    <h2>Original hand text</h2>
+    <p class="muted">The source of truth. Anything above can be rebuilt from this.</p>
+    <pre>{{ hand.raw }}</pre>
+  </section>
+</div>

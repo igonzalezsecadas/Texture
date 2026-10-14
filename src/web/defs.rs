@@ -5,9 +5,9 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// Embedded copy of the authoritative dictionary. From `src/web/`, three
+/// Embedded copy of the authoritative dictionary. From `src/web/`, two
 /// `..` steps reach the repo root.
-const DICTIONARY_MD: &str = include_str!("../../../docs/stat-definitions.md");
+const DICTIONARY_MD: &str = include_str!("../../docs/stat-definitions.md");
 
 /// `(dictionary heading, definition text)` for every `### Heading` section
 /// whose body carries a `**Definition:**` line.

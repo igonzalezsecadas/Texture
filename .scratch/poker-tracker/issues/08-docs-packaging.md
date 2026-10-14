@@ -1,6 +1,6 @@
 # 08 — Statistic dictionary, packaging, snapshot docs
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: none
 

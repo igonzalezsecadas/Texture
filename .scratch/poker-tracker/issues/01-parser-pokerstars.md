@@ -1,6 +1,6 @@
 # 01 — PokerStars hand-history parser
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: none
 

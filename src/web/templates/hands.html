@@ -1,0 +1,25 @@
+{% include "filter_bar.html" %}
+<h1>Hands</h1>
+<p class="muted">Showing {{ showingFrom }}&ndash;{{ showingTo }} of {{ pager.total }} hands
+  &middot; <a href="{{ csvUrl }}">export raw hand histories (CSV)</a></p>
+<table class="stats">
+  <thead><tr><th>Hand</th><th>Time (UTC)</th><th>Stakes</th><th>Table</th><th>Position</th><th>Result</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="{{ r.url }}">{{ r.hand_id }}</a></td>
+      <td>{{ r.ts }}</td>
+      <td>{{ r.stakes }}</td>
+      <td>{{ r.table_size }}-max</td>
+      <td>{{ r.position }}</td>
+      <td class="{% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<nav class="pager">
+  {% if pager.prev %}<a href="{{ pager.prev }}">&larr; newer</a>{% endif %}
+  <span>page {{ pager.page }} of {{ pager.pages }}</span>
+  {% if pager.next %}<a href="{{ pager.next }}">older &rarr;</a>{% endif %}
+</nav>
+{% if not rows %}<p class="empty">No hands match these filters.</p>{% endif %}

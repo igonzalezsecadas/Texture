@@ -1,6 +1,6 @@
 # 04 — All-in EV engine
 
-Status: ready-for-agent
+Status: done
 Type: task
 Blocked by: none
 

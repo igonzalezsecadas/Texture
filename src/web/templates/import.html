@@ -1,0 +1,36 @@
+<h1>Import</h1>
+<section class="cards">
+  <div class="card"><span class="k">Status</span><span class="v">{% if import.running %}running ({{ import.kind }}){% elif import.finished %}idle{% else %}idle{% endif %}</span></div>
+  <div class="card"><span class="k">Files</span><span class="v">{{ import.files_done }} / {{ import.files_total }}</span></div>
+  <div class="card"><span class="k">Hands imported</span><span class="v">{{ import.hands_imported }}</span></div>
+  <div class="card"><span class="k">Duplicates</span><span class="v">{{ import.duplicates }}</span></div>
+  <div class="card"><span class="k">Failures</span><span class="v">{{ import.failures }}</span></div>
+  <div class="card"><span class="k">Quarantined</span><span class="v">{{ import.quarantineCount }}</span></div>
+</section>
+{% if import.current_file %}<p class="muted">Current file: <code>{{ import.current_file }}</code></p>{% endif %}
+{% if import.last_error %}<p class="error">Last error: {{ import.last_error }}</p>{% endif %}
+{% if import.last_run %}
+<p class="muted">Last run: {{ import.last_run.kind }} started {{ import.last_run.started }},
+  finished {{ import.last_run.finished }}, imported {{ import.last_run.hands_imported }},
+  duplicates {{ import.last_run.duplicates }}, failures {{ import.last_run.failures }}.</p>
+{% endif %}
+<h2>Quarantined hands</h2>
+<p class="muted">A hand that cannot be parsed is never silently dropped. Fix the parser,
+then retry the hand here.</p>
+<table class="stats">
+  <thead><tr><th>Hand text</th><th>Reason</th><th>Parser</th><th>First seen</th><th>Last seen</th><th>Retries</th><th></th></tr></thead>
+  <tbody>
+  {% for q in import.quarantine %}
+    <tr>
+      <td><pre class="excerpt">{{ q.excerpt }}</pre></td>
+      <td class="error">{{ q.reason }}</td>
+      <td>v{{ q.parserVersion }}</td>
+      <td>{{ q.first_seen }}</td>
+      <td>{{ q.last_seen }}</td>
+      <td>{{ q.retries }}</td>
+      <td><form method="post" action="/quarantine/{{ q.id }}/retry"><button type="submit">Retry</button></form></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if not import.quarantine %}<p class="muted">Nothing quarantined. Every hand parsed cleanly.</p>{% endif %}

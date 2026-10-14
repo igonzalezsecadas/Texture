@@ -1,6 +1,6 @@
 # 02 — Storage persistence
 
-Status: in-progress (orchestrator)
+Status: done
 Type: task
 Blocked by: none
 

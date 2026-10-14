@@ -1,0 +1,28 @@
+{% include "filter_bar.html" %}
+<h1>Dashboard</h1>
+{% if summary.has_data %}
+<section class="cards">
+  <div class="card"><span class="k">Hands</span><span class="v">{{ summary.hands }}</span></div>
+  <div class="card"><span class="k">Total won</span><span class="v {% if summary.positive %}pos{% else %}neg{% endif %}">{{ summary.net }}</span></div>
+  <div class="card"><span class="k">BB/100</span><span class="v">{{ summary.bb_per_100 }}</span></div>
+  <div class="card"><span class="k">&euro;/100</span><span class="v">{{ summary.currency_per_100 }}</span></div>
+  <div class="card"><span class="k">All-in adjusted</span><span class="v">{{ summary.adjusted }}</span></div>
+  <div class="card"><span class="k">Luck delta</span><span class="v {{ summary.luck_kind }}">{{ summary.luck }}</span></div>
+  <div class="card"><span class="k">Showdown winnings</span><span class="v">{{ summary.showdown }}</span></div>
+  <div class="card"><span class="k">Non-showdown winnings</span><span class="v">{{ summary.non_showdown }}</span></div>
+  <div class="card"><span class="k">Rake paid</span><span class="v">{{ summary.rake }}{% if summary.rake_bb %} <span class="muted">({{ summary.rake_bb }} BB)</span>{% endif %}</span></div>
+</section>
+{% if hasChart %}
+<figure class="chart">
+  <div id="chart"></div>
+  <figcaption>Cumulative winnings, with the all-in adjusted line.
+    {{ summary.hands }} hands, downsampled server-side to a bounded payload.</figcaption>
+</figure>
+<script id="chart-data" type="application/json">{{ chartJson|safe }}</script>
+{% else %}
+<p class="empty">Not enough hands to draw a graph for these filters.</p>
+{% endif %}
+{% else %}
+<p class="empty">No hands match these filters. Import a hand-history folder from the
+<a href="/import">import screen</a>.</p>
+{% endif %}

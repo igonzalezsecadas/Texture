@@ -1,0 +1,57 @@
+{# The filter bar appears on every report screen. Its active state is always
+   visible: either the applied chips, or an explicit "lifetime totals" notice. #}
+<form class="filter" method="get" action="{{ filter.path }}"
+      hx-get="{{ filter.path }}" hx-target="#content" hx-swap="innerHTML" hx-push-url="true">
+  <div class="filter-row">
+    <label>From <input type="date" name="from" value="{{ filter.from }}"></label>
+    <label>To <input type="date" name="to" value="{{ filter.to }}"></label>
+    <label>Stakes
+      <select name="stakes">
+        <option value="">any</option>
+        {% for o in filter.stakeOptions %}
+        <option value="{{ o.value }}" {% if o.selected %}selected{% endif %}>{{ o.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Table
+      <select name="size">
+        <option value="">any</option>
+        {% for o in filter.sizeOptions %}
+        <option value="{{ o.value }}" {% if o.selected %}selected{% endif %}>{{ o.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Position
+      <select name="position">
+        <option value="">any</option>
+        {% for o in filter.positionOptions %}
+        <option value="{{ o.value }}" {% if o.selected %}selected{% endif %}>{{ o.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Hero
+      <select name="profile">
+        <option value="">any</option>
+        {% for o in filter.profileOptions %}
+        <option value="{{ o.value }}" {% if o.selected %}selected{% endif %}>{{ o.label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if filter.sessions %}<input type="hidden" name="session" value="{{ filter.sessions|join(',') }}">{% endif %}
+    <button type="submit">Apply</button>
+  </div>
+</form>
+<div class="active-filters">
+{% if filter.active %}
+  <strong>Filters:</strong>
+  {% for c in filter.chips %}
+    <span class="chip">{{ c.label }}
+      <a href="{{ c.removeUrl }}" hx-get="{{ c.removeUrl }}" hx-target="#content"
+         hx-push-url="true" title="remove this filter">&times;</a></span>
+  {% endfor %}
+  <a class="clear" href="{{ filter.path }}" hx-get="{{ filter.path }}"
+     hx-target="#content" hx-push-url="true">Clear all</a>
+{% else %}
+  <strong class="lifetime">No filters applied &mdash; these are lifetime totals.</strong>
+{% endif %}
+</div>
