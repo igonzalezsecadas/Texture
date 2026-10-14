@@ -4,16 +4,17 @@
 merge into one session. {{ notice }}
 Durations are derived from hand timestamps and are approximate.</p>
 <table class="stats">
-  <thead><tr><th>#</th><th>Start</th><th>End</th><th>Duration (approx.)</th><th>Hands</th><th>Result</th></tr></thead>
+  <thead><tr><th>#</th><th>Start</th><th>End</th><th>Duration (approx.)</th><th>Hands</th><th>Result</th><th></th></tr></thead>
   <tbody>
   {% for r in rows %}
     <tr>
-      <td>{{ r.id }}</td>
+      <td><a href="{{ r.url }}">{{ r.id }}</a></td>
       <td>{{ r.start }}</td>
       <td>{{ r.end }}</td>
       <td>{{ r.duration }}</td>
       <td>{{ r.hands }}</td>
       <td class="{% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
+      <td><a href="{{ r.url }}">review hands</a></td>
     </tr>
   {% endfor %}
   </tbody>

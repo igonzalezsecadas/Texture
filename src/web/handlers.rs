@@ -264,6 +264,9 @@ struct ColumnHeader {
 #[derive(Serialize)]
 struct SessionRow {
     id: i64,
+    /// Link back into the hand browser for exactly this session, carrying the
+    /// rest of the active filter set so the session means the same population.
+    url: String,
     start: String,
     end: String,
     /// Approximate: derived from first/last hand timestamps (story 70/71).
@@ -689,8 +692,15 @@ pub async fn sessions(
         .iter()
         .map(|s: &Session| {
             let duration = (s.ended_at.timestamp() - s.started_at.timestamp()).max(0);
+            let base = fv.query_without("session");
+            let url = if base.is_empty() {
+                format!("/hands?session={}", s.id)
+            } else {
+                format!("/hands?{base}&session={}", s.id)
+            };
             SessionRow {
                 id: s.id,
+                url,
                 start: s.started_at.format("%Y-%m-%d %H:%M UTC").to_string(),
                 end: s.ended_at.format("%Y-%m-%d %H:%M UTC").to_string(),
                 // Duration is first-hand→last-hand wall time; always labelled

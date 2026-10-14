@@ -301,3 +301,32 @@ async fn static_assets_are_served_from_the_embedded_bundle() {
     let (missing, _) = get(&env.state, "/static/nope.js").await;
     assert_eq!(missing, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn a_session_links_to_its_own_hands() {
+    let env = populated();
+    let (_, sessions) = get(&env.state, "/sessions").await;
+    assert!(sessions.contains("review hands"), "each session must be reviewable");
+    // Session 0 is the first hand only; the link must carry the session filter.
+    // The URL is HTML-escaped by the template (minijinja escapes `/`), which a
+    // browser decodes, so assert on the part that identifies the filter.
+    assert!(
+        sessions.contains("href=") && sessions.contains("session=0"),
+        "sessions must link into the browser: {sessions}"
+    );
+
+    let (status, hands) = get(&env.state, "/hands?session=0").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        hands.contains("Clear all"),
+        "the session filter must be visible on the hand browser"
+    );
+    // Exactly one of the three hands belongs to session 0.
+    let listed = hands.matches("2024-01-").count();
+    assert!(listed > 0, "the session's hands must be listed");
+    let (_, all) = get(&env.state, "/hands").await;
+    assert!(
+        all.matches("2024-01-").count() > listed,
+        "a session filter must select fewer hands than the unfiltered list"
+    );
+}
