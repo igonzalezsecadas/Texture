@@ -1,0 +1,59 @@
+# texture — one command to start: `docker compose up -d`
+#
+# What this service expects on the host next to this file:
+#   ./hands/  PokerStars hand-history folder, mounted READ-ONLY so the
+#             container can never modify or delete your history files.
+#   ./data/   SQLite database + snapshots, mounted READ-WRITE. Rebuild the
+#             container freely; your data lives here.
+#
+# IMPORTANT: Docker is NOT installed on the development machine that authored
+# this file. See README.md "Status of the Docker path". The compose file is
+# written to spec but has not been executed yet — treat the first `up` as the
+# real test and report failures as issues.
+
+services:
+  texture:
+    build: .
+    image: texture:local
+    container_name: texture
+    restart: unless-stopped
+
+    # Publish on the loopback interface only. The UI has no authentication,
+    # TLS, or session layer by design — it must never be reachable from the
+    # network. Note that inside the container the process must bind to
+    # 0.0.0.0 (via TEXTURE_BIND_ADDR below) for the port mapping to work at
+    # all; the 127.0.0.1 restriction here is what keeps it localhost-only
+    # from the host's perspective.
+    ports:
+      - "127.0.0.1:8080:8080"
+
+    volumes:
+      # Hand histories: read-only, by design.
+      - ./hands:/hands:ro
+      # Database + snapshots: read-write.
+      - ./data:/data
+
+    environment:
+      # Paths inside the container (match the mounts above).
+      TEXTURE_DATA_DIR: /data
+      TEXTURE_HAND_HISTORY_DIR: /hands
+      # Snapshots default to <TEXTURE_DATA_DIR>/snapshots, i.e. /data/snapshots
+      # here, so they land on the host bind mount automatically. Override with
+      # TEXTURE_SNAPSHOT_DIR only if you want them elsewhere.
+      # Web listener inside the container. Must be 0.0.0.0 inside; the
+      # ports: block above confines exposure to the host's loopback.
+      TEXTURE_BIND_ADDR: 0.0.0.0:8080
+      # Automatic snapshot schedule: every 6 hours, keep 14 snapshots.
+      TEXTURE_SNAPSHOT_INTERVAL_SECS: "21600"
+      TEXTURE_SNAPSHOT_RETENTION: "14"
+      # Log filter (tracing EnvFilter). Set TEXTURE_LOG_JSON=1 for JSON logs.
+      RUST_LOG: texture=info,tower_http=info,warn
+
+    # Mirrors the HEALTHCHECK in the Dockerfile. Specifying it here makes the
+    # health behavior visible and adjustable without rebuilding the image.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3

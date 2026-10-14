@@ -171,6 +171,31 @@ impl Db {
         })?;
         ids.into_iter().map(|id| self.profile(id)).collect()
     }
+
+    /// Resolve the hero profile for `hero_name`, creating the player, the profile
+    /// and the alias, and making it active if no profile is active yet. Called on
+    /// first run so the operator never has to type the identity their stats
+    /// depend on.
+    pub fn ensure_hero_profile(&self, hero_name: &str) -> Result<(i64, i64), StorageError> {
+        let player_id = self.upsert_player(hero_name)?;
+        let profile_id = match self.active_profile()? {
+            Some(p) => p.id,
+            None => self.create_profile("default")?,
+        };
+        self.add_profile_player(profile_id, player_id)?;
+        if self.active_profile()?.is_none() {
+            self.set_active_profile(profile_id)?;
+        }
+        Ok((profile_id, player_id))
+    }
+
+    /// The set of player ids that constitute the active hero profile.
+    pub fn active_player_ids(&self) -> Result<(i64, Vec<i64>), StorageError> {
+        match self.active_profile()? {
+            Some(p) => Ok((p.id, p.player_ids)),
+            None => Err(StorageError::NotFound("no active hero profile".into())),
+        }
+    }
 }
 
 /// Apply the SQLite pragmas every connection needs.
