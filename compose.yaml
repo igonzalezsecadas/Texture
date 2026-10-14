@@ -46,12 +46,12 @@ services:
       # Paths inside the container (match the mounts above).
       TEXTURE_DATA_DIR: /data
       TEXTURE_HAND_HISTORY_DIR: /hands
-      # REQUIRED IN PRACTICE: your PokerStars screen name. Every statistic depends
-      # on knowing which seat is you. PokerStars names its per-account folder
-      # `<screen name><account number>` (e.g. `hero.name12345`), and that suffix
-      # is what makes auto-detection possible. A generic folder such as ./hands
-      # has no suffix, so detection deliberately refuses to guess and you get
-      # zero statistics plus a warning in the logs. Uncomment and set this:
+      # OPTIONAL: your PokerStars screen name. You normally do NOT need this:
+      # on first run texture reads the name out of the hand files themselves
+      # (`Dealt to <name>`), which is exact and survives a rename via aliases.
+      # Set it only to force a specific identity, or if the folder is still empty
+      # on the very first run. If no hero can be found you get a warning and zero
+      # statistics rather than statistics attributed to the wrong player.
       # TEXTURE_HERO_NAME: your.screen.name
       # Snapshots default to <TEXTURE_DATA_DIR>/snapshots, i.e. /data/snapshots
       # here, so they land on the host bind mount automatically. Override with

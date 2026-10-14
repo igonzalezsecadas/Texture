@@ -170,21 +170,28 @@ fn first_run_setup(db: &Db, hands_dir: &std::path::Path, explicit: Option<String
     }
     let detected = explicit
         .filter(|s| !s.trim().is_empty())
-        .or_else(|| importer::detect_hero_name(hands_dir));
+        .map(|name| (name, "TEXTURE_HERO_NAME"))
+        // Prefer reading the name out of the hands: PokerStars writes
+        // `Dealt to <name>` only for the file's owner, so this is exact and does
+        // not depend on how the directory is named.
+        .or_else(|| importer::detect_hero_from_hands(hands_dir).map(|n| (n, "the hands themselves")));
     match detected {
-        Some(name) => match db.ensure_hero_profile(&name) {
+        Some((name, source)) => match db.ensure_hero_profile(&name) {
             Ok((profile_id, player_id)) => tracing::info!(
                 hero = %name,
+                source,
                 profile_id,
                 player_id,
-                "detected the hero from the hand-history folder; set TEXTURE_HERO_NAME to override"
+                "registered the hero; set TEXTURE_HERO_NAME to override"
             ),
             Err(e) => tracing::error!(hero = %name, error = %e, "could not register the hero"),
         },
         None => tracing::warn!(
             hands = %hands_dir.display(),
-            "no hero identity found; set TEXTURE_HERO_NAME or configure it on the settings screen, 
-             otherwise no statistics will be produced"
+            "no hero identity found: no hand histories are readable there yet. Set \
+             TEXTURE_HERO_NAME or configure it on the settings screen, otherwise no \
+             statistics will be produced. If the folder is empty, import some hands first \
+             and the hero will be detected from them automatically."
         ),
     }
 }

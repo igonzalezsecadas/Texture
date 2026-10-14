@@ -278,32 +278,90 @@ external backup tooling.
 
 ## Getting hand histories
 
-PokerStars writes hand histories to a folder you control:
+### 1. Make PokerStars write them
 
-1. In the PokerStars client: **Settings → Account History → Saving/Trading
-   History** — enable *Keep my hand history in* and choose a folder
-   (e.g. `~/PokerStars/hands`); enable the writing of hand histories to disk.
-2. Point texture at that folder: `TEXTURE_HAND_HISTORY_DIR`, or symlink it to
-   `./hands`. Under Wine or a compatibility layer, the path is whatever the
-   Wine prefix maps the folder to — pass that path; no code changes are
-   needed for non-native paths.
-3. Mount it **read-only** in Docker (compose.yaml already does
-   `./hands:/hands:ro`).
+In the PokerStars client, open **Settings** (the gear icon) → **Playing History**
+→ **Hand History**, and tick **Save My Hand Histories**. Set the folder if the
+client offers it. Older clients put this under
+**Options → Instant Hand History**. Until this is on, the folder is empty and
+there is nothing to import.
 
-Important caveats:
+Files are written as `HH<YYYYMMDD> <your screen name>.txt`, one per day, and
+appended to while you play. The containing folder is named after your screen
+name.
+
+### 2. Find the folder
+
+| Where you play | Typical path |
+|---|---|
+| Windows | `C:\Users\<you>\AppData\Local\PokerStars\HandHistory\<ScreenName>\` |
+| Wine | `~/.wine/drive_c/users/<wine user>/AppData/Local/PokerStars/HandHistory/<ScreenName>/` |
+| Lutris / other prefixes | `~/Games/<game>/drive_c/users/<wine user>/AppData/Local/PokerStars/HandHistory/<ScreenName>/` |
+
+If you are not sure, find it:
+
+```sh
+find ~ -ipath '*PokerStars*HandHistory*' -maxdepth 9 2>/dev/null | head
+```
+
+### 3. Point texture at it, read-only
+
+Edit the `volumes:` block in `compose.yaml` to bind the real folder instead of
+the placeholder `./hands`:
+
+```yaml
+    volumes:
+      - /home/you/.wine/drive_c/users/you/AppData/Local/PokerStars/HandHistory/your.name:/hands:ro
+      - ./data:/data
+```
+
+Keep the `:ro` suffix. The container is then structurally incapable of modifying
+or deleting your history files — that is enforced by the kernel, not by a promise
+in the code. Then:
+
+```sh
+docker compose up -d --build
+docker compose logs --tail=20 texture
+```
+
+### 4. The hero is detected from the hands themselves
+
+You do not have to tell texture your screen name. On first run it reads a few of
+the hand files and takes the name from `Dealt to <name> [cards]` — PokerStars
+writes that line only for the player the file belongs to, so the name that
+appears there *is* your screen name. The log line says where it got it from:
+
+```
+registered the hero; set TEXTURE_HERO_NAME to override hero=your.name source="the hands themselves"
+```
+
+Set `TEXTURE_HERO_NAME` only if you want to force it, or if the folder is still
+empty on the very first run (there is nothing to read yet — it will be detected
+on the next start once hands exist). If no hero is found you get an explicit
+warning and zero statistics rather than statistics attributed to the wrong
+player.
+
+Later renames are handled on the **Settings** screen: add a new screen name to
+the same profile as an alias, and your lifetime results stay in one place.
+
+### Caveats
 
 - **The PokerStars client purges old hand histories.** The on-disk folder may
-  hold less history than you expect. The recovery path for the back catalog
-  is PokerTracker 4's archive and its export function: export hands from PT4,
-  put them in a folder, and `texture import` it. That is also the fastest
-  source of the initial backfill.
-- Only complete hands (with a summary section) are imported. A hand being
-  written while the watcher reads the file is skipped until it is complete —
-  no corrupt hands, ever.
+  hold less history than you expect. The recovery path for the back catalog is
+  PokerTracker 4's archive and its export function: export hands from PT4, put
+  them in a folder, and `texture import` it. That is also the fastest source of
+  the initial backfill.
+- Only complete hands (with a summary section) are imported. A hand being written
+  while the watcher reads the file is skipped until it is complete — no corrupt
+  hands, ever.
 - Hands you were not dealt into are not counted, so your hand count matches
   PokerTracker 4's.
 - Import is idempotent: re-reading or appending to files never double-counts,
   because the PokerStars hand ID is the natural key.
+- EUR only, deliberately. A `$` hand is quarantined with an explicit reason rather
+  than folded into a EUR total. See `fixtures/README.md` for the format
+  assumptions and the one summary line (a separate jackpot drop) that has never
+  been seen in a real file.
 
 ## Verifying the numbers
 

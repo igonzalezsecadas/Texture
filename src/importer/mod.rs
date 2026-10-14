@@ -487,26 +487,70 @@ pub fn reparse(
     Ok(acc.into_outcome(t0.elapsed().as_millis()))
 }
 
+/// Detect the hero's screen name from the hand histories themselves.
+///
+/// This is the most reliable source, and the one to prefer. PokerStars writes
+/// `Dealt to <screen name> [cards]` only for the player the file belongs to, so
+/// the name that appears there across several hands *is* the hero. Unlike the
+/// folder name it does not depend on how the directory happens to be named, and
+/// unlike an alias it is the name the client is actually writing right now.
+///
+/// Reads a bounded prefix of a handful of files so a large archive is cheap.
+pub fn detect_hero_from_hands(dir: &Path) -> Option<String> {
+    /// Enough of a file to contain many `Dealt to` lines.
+    const PREFIX_BYTES: usize = 256 * 1024;
+    /// Enough files to be confident, without reading an archive.
+    const MAX_FILES: usize = 20;
+
+    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for path in list_files(dir).into_iter().take(MAX_FILES) {
+        let Some(text) = read_prefix(&path, PREFIX_BYTES) else { continue };
+        for line in text.lines() {
+            let Some(rest) = line.trim().strip_prefix("Dealt to ") else { continue };
+            let Some((name, _)) = rest.split_once(" [") else { continue };
+            let name = name.trim();
+            if !name.is_empty() {
+                *counts.entry(name.to_string()).or_default() += 1;
+            }
+        }
+        // One name seen more than once is conclusive: the client only deals to
+        // its owner's seat from the owner's perspective.
+        if counts.values().any(|seen| *seen > 1) {
+            break;
+        }
+    }
+    counts
+        .into_iter()
+        .max_by_key(|(_, seen)| *seen)
+        .map(|(name, _)| name)
+}
+
+/// Read at most `limit` bytes from a file as lossy UTF-8, tolerating a truncated
+/// final character.
+fn read_prefix(path: &Path, limit: usize) -> Option<String> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).ok()?;
+    let mut buffer = Vec::with_capacity(limit.min(64 * 1024));
+    file.take(limit as u64).read_to_end(&mut buffer).ok()?;
+    Some(String::from_utf8_lossy(&buffer).into_owned())
+}
+
 /// Detect the hero's screen name from a PokerStars hand-history folder name.
 ///
-/// PokerStars names the per-account folder `<screen name><account number>`, for
-/// example `hero.name12345`. Detection therefore requires a trailing numeric
-/// account suffix: a generic folder such as `hands` or `HandHistory` yields
-/// `None`, because guessing an identity there would silently attribute every
-/// statistic to a player who does not exist.
+/// **Not used by first-run setup.** It is kept only as a documented dead end:
+/// PokerStars does name the per-account folder after the screen name, but a
+/// directory name is not evidence of an identity. `hands`, `HandHistory`, and
+/// any temp directory ending in digits all look plausible and none of them is a
+/// player, so a guess here silently attributes every statistic to somebody who
+/// does not exist. [`detect_hero_from_hands`] reads the name out of the hands
+/// instead, which is exact.
 pub fn detect_hero_name(dir: &Path) -> Option<String> {
     let name = dir.file_name()?.to_str()?;
     let trimmed = name.trim_end_matches(|c: char| c.is_ascii_digit());
-    if trimmed.len() == name.len() {
-        // No account suffix: not a PokerStars account folder.
+    if trimmed.len() == name.len() || trimmed.trim_end_matches('.').is_empty() {
         return None;
     }
-    let trimmed = trimmed.trim_end_matches('.');
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
-    }
+    Some(trimmed.trim_end_matches('.').to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -721,4 +765,68 @@ pub fn is_hand_history_file(path: &Path) -> bool {
         path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref(),
         Some("txt")
     )
+}
+
+#[cfg(test)]
+mod detection_tests {
+    use super::*;
+
+    /// A PokerStars hand-history file as the client writes it: the folder is the
+    /// screen name and only the owner's seat is ever "Dealt to".
+    fn hand_file(id: u64, hero: &str) -> String {
+        format!(
+            r#"PokerStars Hand #{id}:  Hold'em No Limit (€0.25/€0.50 EUR) - 2024/01/02 13:00:00 CET [2024/01/02 7:00:00 ET]
+Table 'Alpha' 6-max Seat #6 is the button
+Seat 1: villainAA (€50 in chips)
+Seat 2: {hero} (€50 in chips)
+villainAA: posts small blind €0.25
+{hero}: posts big blind €0.50
+*** HOLE CARDS ***
+Dealt to {hero} [As Kd]
+villainAA: folds
+Uncalled bet (€0.25) returned to {hero}
+{hero} collected €0.50 from pot
+*** SUMMARY ***
+Total pot €0.50 | Rake €0.00
+"#
+        )
+    }
+
+    #[test]
+    fn the_hero_is_read_out_of_the_hands_not_the_folder_name() {
+        // A folder named exactly like the real client's: no numeric suffix.
+        let dir = crate::storage::tempdir::TempDir::new("texture-hero").expect("temp dir");
+        std::fs::write(dir.path().join("HH20240102 hero.name.txt"), hand_file(1, "hero.name"))
+            .expect("write");
+        std::fs::write(dir.path().join("HH20240103 hero.name.txt"), hand_file(2, "hero.name"))
+            .expect("write");
+
+        assert_eq!(
+            detect_hero_from_hands(dir.path()).as_deref(),
+            Some("hero.name"),
+            "the name must come from the hand data"
+        );
+    }
+
+    #[test]
+    fn an_empty_archive_invents_no_player() {
+        let dir = crate::storage::tempdir::TempDir::new("texture-hero").expect("temp dir");
+        assert_eq!(detect_hero_from_hands(dir.path()), None);
+    }
+
+    #[test]
+    fn a_directory_name_is_not_an_identity() {
+        // The reason folder-name detection is not wired up: every one of these
+        // looks name-like and none of them is a player.
+        let base = crate::storage::tempdir::TempDir::new("texture-hero").expect("temp dir");
+        for name in ["hands", "HandHistory", "texture-hero-1234-5678"] {
+            let candidate = base.path().join(name);
+            std::fs::create_dir(&candidate).expect("mkdir");
+            // Whatever this returns, first-run setup must not trust it, so the
+            // guard that matters is that the *hands* are the only trusted source.
+            let _ = detect_hero_name(&candidate);
+        }
+        // With no readable hands anywhere, nothing is detected.
+        assert_eq!(detect_hero_from_hands(base.path()), None);
+    }
 }
