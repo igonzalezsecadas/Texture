@@ -1,0 +1,42 @@
+PokerStars Hand #100000000010:  Hold'em No Limit (€0.50/€1.00 EUR) - 2024/01/02 12:45:00 CET [2024/01/02 6:45:00 ET]
+Table 'Omega' 9-max Seat #9 is the button
+Seat 1: villainSB (€100 in chips)
+Seat 2: villainBB (€100 in chips)
+Seat 3: villainUTG (€100 in chips)
+Seat 4: villainUTG1 (€100 in chips)
+Seat 5: villainUTG2 (€100 in chips)
+Seat 6: villainMP (€100 in chips)
+Seat 7: villainHJ (€100 in chips)
+Seat 8: villainCO (€100 in chips)
+Seat 9: hero (€100 in chips)
+villainSB: posts small blind €0.50
+villainBB: posts big blind €1
+*** HOLE CARDS ***
+Dealt to hero [As Kd]
+villainUTG: folds
+villainUTG1: folds
+villainUTG2: folds
+villainMP: folds
+villainHJ: folds
+villainCO: folds
+hero: raises €2 to €3
+villainSB: folds
+villainBB: calls €2
+*** FLOP *** [Ad 7c 2d]
+villainBB: checks
+hero: bets €4
+villainBB: calls €4
+*** TURN *** [Ad 7c 2d] [Ts]
+villainBB: checks
+hero: checks
+*** RIVER *** [Ad 7c 2d Ts] [Kh]
+villainBB: checks
+hero: bets €10
+villainBB: folds
+Uncalled bet (€10) returned to hero
+hero collected €14 from pot
+*** SUMMARY ***
+Total pot €14.50 | Rake €0.50
+Board [Ad 7c 2d Ts Kh]
+Seat 2: villainBB (big blind) folded on the River
+Seat 9: hero (button) collected (€14)

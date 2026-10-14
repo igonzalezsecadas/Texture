@@ -20,6 +20,9 @@ pub fn default_parser() -> impl HandParser {
     pokerstars::PokerStarsParser
 }
 
+/// Parse one complete PokerStars hand history with the default parser.
+pub use pokerstars::parse_hand;
+
 /// Split a hand-history file's text into complete hand histories and the byte
 /// offset where the trailing incomplete hand begins.
 ///

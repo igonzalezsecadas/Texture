@@ -1,0 +1,31 @@
+PokerStars Hand #100000000005:  Hold'em No Limit (€0.25/€0.50 EUR) - 2024/01/02 12:20:00 CET [2024/01/02 6:20:00 ET]
+Table 'Alpha' 6-max Seat #6 is the button
+Seat 1: villainSB (€50 in chips)
+Seat 2: hero (€50 in chips)
+Seat 3: villainUTG (€50 in chips)
+Seat 4: villainMP (€50 in chips)
+Seat 5: villainCO (€50 in chips)
+Seat 6: villainBTN (€50 in chips)
+villainSB: posts small blind €0.25
+hero: posts big blind €0.50
+*** HOLE CARDS ***
+Dealt to hero [As Ad]
+villainUTG: folds
+villainMP: folds
+villainCO: raises €1 to €1.50
+villainBTN: folds
+villainSB: folds
+hero: raises €49.50 to €50 and is all-in
+villainCO: calls €48.50 and is all-in
+*** FLOP *** [Ah 7c 2d]
+*** TURN *** [Ah 7c 2d] [Ts]
+*** RIVER *** [Ah 7c 2d Ts] [Kh]
+*** SHOW DOWN ***
+hero: shows [As Ad] (three of a kind, Aces)
+villainCO: shows [Ks Kd] (three of a kind, Kings)
+hero collected €98.25 from pot
+*** SUMMARY ***
+Total pot €100.25 | Rake €2
+Board [Ah 7c 2d Ts Kh]
+Seat 2: hero (big blind) showed [As Ad] and won (€98.25) with three of a kind, Aces
+Seat 5: villainCO (cutoff) showed [Ks Kd] and lost with three of a kind, Kings

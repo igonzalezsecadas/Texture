@@ -583,9 +583,9 @@ impl<'a> Parser<'a> {
                 self.board = board;
             }
         }
-        if self.streets_dealt.is_empty() {
-            // Every hand has at least a preflop.
-            self.streets_dealt.push(Street::Preflop);
+        // Preflop is always dealt, and always comes first.
+        if !self.streets_dealt.contains(&Street::Preflop) {
+            self.streets_dealt.insert(0, Street::Preflop);
         }
 
         let positions = assign_positions(self.button_seat, &self.seats);
@@ -991,7 +991,10 @@ Seat 6: villainEE (button) folded before Flop
         assert_eq!(hand.tz_token, "CET");
         // 2024-01-02 07:45:06 EST == 12:45:06 UTC
         assert_eq!(hand.timestamp_utc.to_string(), "2024-01-02 12:45:06 UTC");
-        assert_eq!(hand.streets_dealt, vec![Street::Flop, Street::Turn]);
+        assert_eq!(
+            hand.streets_dealt,
+            vec![Street::Preflop, Street::Flop, Street::Turn]
+        );
     }
 
     #[test]

@@ -1,0 +1,299 @@
+{
+  "site": "PokerStars",
+  "hand_id": "100000000004",
+  "game": "NoLimitHoldem",
+  "currency": "EUR",
+  "small_blind": {
+    "minor": 25,
+    "currency": "EUR"
+  },
+  "big_blind": {
+    "minor": 50,
+    "currency": "EUR"
+  },
+  "table_name": "Alpha",
+  "table_size": 6,
+  "button_seat": 6,
+  "timestamp_utc": "2024-01-02T11:15:00Z",
+  "local_timestamp": "2024/01/02 12:15:00",
+  "tz_token": "CET",
+  "board": [
+    {
+      "rank": 14,
+      "suit": "h"
+    },
+    {
+      "rank": 13,
+      "suit": "h"
+    },
+    {
+      "rank": 12,
+      "suit": "h"
+    },
+    {
+      "rank": 11,
+      "suit": "h"
+    },
+    {
+      "rank": 10,
+      "suit": "h"
+    }
+  ],
+  "seats": [
+    {
+      "seat": 1,
+      "screen_name": "villainSB",
+      "starting_stack": {
+        "minor": 5000,
+        "currency": "EUR"
+      },
+      "position": "Sb",
+      "contributed": 25,
+      "result": {
+        "minor": -25,
+        "currency": "EUR"
+      },
+      "shown_cards": [],
+      "sat_out": false
+    },
+    {
+      "seat": 2,
+      "screen_name": "hero",
+      "starting_stack": {
+        "minor": 5000,
+        "currency": "EUR"
+      },
+      "position": "Bb",
+      "contributed": 300,
+      "result": {
+        "minor": 0,
+        "currency": "EUR"
+      },
+      "shown_cards": [
+        {
+          "rank": 2,
+          "suit": "c"
+        },
+        {
+          "rank": 3,
+          "suit": "d"
+        }
+      ],
+      "sat_out": false
+    },
+    {
+      "seat": 3,
+      "screen_name": "villainUTG",
+      "starting_stack": {
+        "minor": 5000,
+        "currency": "EUR"
+      },
+      "position": "Utg",
+      "contributed": 0,
+      "result": {
+        "minor": 0,
+        "currency": "EUR"
+      },
+      "shown_cards": [],
+      "sat_out": false
+    },
+    {
+      "seat": 4,
+      "screen_name": "villainMP",
+      "starting_stack": {
+        "minor": 5000,
+        "currency": "EUR"
+      },
+      "position": "Mp",
+      "contributed": 0,
+      "result": {
+        "minor": 0,
+        "currency": "EUR"
+      },
+      "shown_cards": [],
+      "sat_out": false
+    },
+    {
+      "seat": 5,
+      "screen_name": "villainCO",
+      "starting_stack": {
+        "minor": 5000,
+        "currency": "EUR"
+      },
+      "position": "Co",
+      "contributed": 300,
+      "result": {
+        "minor": 0,
+        "currency": "EUR"
+      },
+      "shown_cards": [
+        {
+          "rank": 4,
+          "suit": "c"
+        },
+        {
+          "rank": 5,
+          "suit": "d"
+        }
+      ],
+      "sat_out": false
+    },
+    {
+      "seat": 6,
+      "screen_name": "villainBTN",
+      "starting_stack": {
+        "minor": 5000,
+        "currency": "EUR"
+      },
+      "position": "Btn",
+      "contributed": 0,
+      "result": {
+        "minor": 0,
+        "currency": "EUR"
+      },
+      "shown_cards": [],
+      "sat_out": false
+    }
+  ],
+  "actions": [
+    {
+      "street": "Preflop",
+      "seat": 1,
+      "kind": "PostSmallBlind",
+      "amount": 25,
+      "to_amount": 25,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Preflop",
+      "seat": 2,
+      "kind": "PostBigBlind",
+      "amount": 50,
+      "to_amount": 50,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Preflop",
+      "seat": 3,
+      "kind": "Fold",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Preflop",
+      "seat": 4,
+      "kind": "Fold",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Preflop",
+      "seat": 5,
+      "kind": "Raise",
+      "amount": 150,
+      "to_amount": 150,
+      "is_first_aggression": true
+    },
+    {
+      "street": "Preflop",
+      "seat": 6,
+      "kind": "Fold",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Preflop",
+      "seat": 1,
+      "kind": "Fold",
+      "amount": 0,
+      "to_amount": 25,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Preflop",
+      "seat": 2,
+      "kind": "Call",
+      "amount": 100,
+      "to_amount": 150,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Flop",
+      "seat": 2,
+      "kind": "Check",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Flop",
+      "seat": 5,
+      "kind": "Bet",
+      "amount": 150,
+      "to_amount": 150,
+      "is_first_aggression": true
+    },
+    {
+      "street": "Flop",
+      "seat": 2,
+      "kind": "Call",
+      "amount": 150,
+      "to_amount": 150,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Turn",
+      "seat": 2,
+      "kind": "Check",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    },
+    {
+      "street": "Turn",
+      "seat": 5,
+      "kind": "Check",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    },
+    {
+      "street": "River",
+      "seat": 2,
+      "kind": "Check",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    },
+    {
+      "street": "River",
+      "seat": 5,
+      "kind": "Check",
+      "amount": 0,
+      "to_amount": 0,
+      "is_first_aggression": false
+    }
+  ],
+  "pot_total": {
+    "minor": 625,
+    "currency": "EUR"
+  },
+  "rake": {
+    "minor": 25,
+    "currency": "EUR"
+  },
+  "jackpot_drop": {
+    "minor": 0,
+    "currency": "EUR"
+  },
+  "went_to_showdown": true,
+  "streets_dealt": [
+    "Preflop",
+    "Flop",
+    "Turn",
+    "River"
+  ]
+}
