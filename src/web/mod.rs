@@ -8,6 +8,7 @@ pub mod render;
 
 use crate::config::Config;
 use crate::storage::Db;
+use axum::extract::DefaultBodyLimit;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{extract::Path, http::header, http::StatusCode, Router};
@@ -100,8 +101,8 @@ async fn static_asset(Path(name): Path<String>) -> Response {
 
 /// Build the router without binding a socket (used by tests).
 ///
-/// `GET` routes are reader-only; the only writes are the settings and
-/// quarantine actions, which redirect back to their screen.
+/// `GET` routes are reader-only; the writes are settings, quarantine retry, and
+/// hand-history upload, which redirect back or render their own summary.
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(handlers::dashboard))
@@ -112,6 +113,11 @@ pub fn router(state: AppState) -> Router {
         .route("/hands", get(handlers::hands))
         .route("/hands/:id", get(handlers::hand_detail))
         .route("/import", get(handlers::import_screen))
+        .route(
+            "/import/upload",
+            post(handlers::upload_hands)
+                .layer(DefaultBodyLimit::max(handlers::MAX_UPLOAD_BYTES)),
+        )
         .route("/quarantine/:id/retry", post(handlers::retry_quarantine))
         .route("/settings", get(handlers::settings))
         .route("/settings/profiles", post(handlers::create_profile))

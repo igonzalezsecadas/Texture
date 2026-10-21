@@ -1,4 +1,11 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Analysis</p>
+    <h1>Postflop</h1>
+    <p class="lede">C-bets, check-raises, probes, showdown tendencies, and aggression by street.</p>
+  </div>
+  {% if groupName != "none" %}<div class="head-actions"><span class="pill">grouped by {{ groupName }}</span></div>{% endif %}
+</header>
+
 {% include "filter_bar.html" %}
-<h1>Postflop</h1>
-<p class="muted">Action: {{ groupName }}</p>
 {% include "stat_table.html" %}

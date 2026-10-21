@@ -1,25 +1,36 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Analysis</p>
+    <h1>Position</h1>
+    <p class="lede">The same filter set, broken down by seat. Compare how each position actually performs.</p>
+  </div>
+</header>
+
 {% include "filter_bar.html" %}
-<h1>Position</h1>
-<p class="muted">Every statistic broken down by seat. Action: {{ groupName }}</p>
-<table class="stats">
-  <thead>
-    <tr>
-      <th>Position</th>
-      {% for c in columns %}<th><abbr class="def" title="{{ c.definition }}">{{ c.label }}</abbr></th>{% endfor %}
-    </tr>
-  </thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <th scope="row">{{ r.label }}</th>
-      <td>{{ r.hands }}</td>
-      <td class="{% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
-      <td>{{ r.bb_per_100 }}</td>
-      <td>{{ r.vpip }}</td>
-      <td>{{ r.pfr }}</td>
-      <td>{{ r.wtsd }}</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% if not rows %}<p class="empty">No hands match these filters.</p>{% endif %}
+
+<div class="card table-card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Position</th>
+          {% for c in columns %}<th class="num"><abbr class="def" title="{{ c.definition }}">{{ c.label }}</abbr></th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <th scope="row" class="row-title">{{ r.label }}</th>
+          <td class="num">{{ r.hands }}</td>
+          <td class="num {% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
+          <td class="num">{{ r.bb_per_100 }}</td>
+          <td class="num">{{ r.vpip }}</td>
+          <td class="num">{{ r.pfr }}</td>
+          <td class="num">{{ r.wtsd }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if not rows %}<p class="empty-note">No hands match these filters.</p>{% endif %}

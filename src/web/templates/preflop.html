@@ -1,4 +1,11 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Analysis</p>
+    <h1>Preflop</h1>
+    <p class="lede">Entry hands, aggression, and blind play, with every definition from the statistic dictionary.</p>
+  </div>
+  {% if groupName != "none" %}<div class="head-actions"><span class="pill">grouped by {{ groupName }}</span></div>{% endif %}
+</header>
+
 {% include "filter_bar.html" %}
-<h1>Preflop</h1>
-<p class="muted">Action: {{ groupName }}</p>
 {% include "stat_table.html" %}

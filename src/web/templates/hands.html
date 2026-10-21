@@ -1,25 +1,48 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Analysis</p>
+    <h1>Hands</h1>
+    <p class="lede">The raw material behind every statistic. Open a hand to compare the parse with the original text.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn ghost" href="{{ csvUrl }}">Export CSV</a>
+  </div>
+</header>
+
 {% include "filter_bar.html" %}
-<h1>Hands</h1>
-<p class="muted">Showing {{ showingFrom }}&ndash;{{ showingTo }} of {{ pager.total }} hands
-  &middot; <a href="{{ csvUrl }}">export raw hand histories (CSV)</a></p>
-<table class="stats">
-  <thead><tr><th>Hand</th><th>Time (UTC)</th><th>Stakes</th><th>Table</th><th>Position</th><th>Result</th></tr></thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <td><a href="{{ r.url }}">{{ r.hand_id }}</a></td>
-      <td>{{ r.ts }}</td>
-      <td>{{ r.stakes }}</td>
-      <td>{{ r.table_size }}-max</td>
-      <td>{{ r.position }}</td>
-      <td class="{% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-<nav class="pager">
-  {% if pager.prev %}<a href="{{ pager.prev }}">&larr; newer</a>{% endif %}
-  <span>page {{ pager.page }} of {{ pager.pages }}</span>
-  {% if pager.next %}<a href="{{ pager.next }}">older &rarr;</a>{% endif %}
+
+<p class="result-line">
+  Showing <strong>{{ showingFrom }}&ndash;{{ showingTo }}</strong> of <strong>{{ pager.total }}</strong> hands
+</p>
+
+<div class="card table-card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr><th>Hand</th><th>Time (UTC)</th><th>Stakes</th><th>Table</th><th>Position</th><th class="num">Result</th></tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <th scope="row" class="row-title"><a href="{{ r.url }}">{{ r.hand_id }}</a></th>
+          <td class="muted">{{ r.ts }}</td>
+          <td>{{ r.stakes }}</td>
+          <td>{{ r.table_size }}-max</td>
+          <td>{{ r.position }}</td>
+          <td class="num {% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if rows %}
+<nav class="pager" aria-label="Hand pages">
+  {% if pager.prev %}<a class="btn ghost small" href="{{ pager.prev }}">&larr; newer</a>{% else %}<span></span>{% endif %}
+  <span class="pager-state">page {{ pager.page }} of {{ pager.pages }}</span>
+  {% if pager.next %}<a class="btn ghost small" href="{{ pager.next }}">older &rarr;</a>{% else %}<span></span>{% endif %}
 </nav>
-{% if not rows %}<p class="empty">No hands match these filters.</p>{% endif %}
+{% else %}
+<p class="empty-note">No hands match these filters.</p>
+{% endif %}

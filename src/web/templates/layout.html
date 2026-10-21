@@ -3,33 +3,65 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>{{ title }} · texture</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%231b1c1e'/%3E%3Cpath d='M12 5C9.8 7.7 6.2 9.9 6.2 12.7c0 1.8 1.2 3 2.8 3 .9 0 1.7-.4 2.3-1-.1 1.4-.6 2.6-1.4 3.9h4.2c-.8-1.3-1.3-2.5-1.4-3.9.6.6 1.4 1 2.3 1 1.6 0 2.8-1.2 2.8-3C17.8 9.9 14.2 7.7 12 5Z' fill='%23f6f4ef'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/uPlot.min.css">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
-</head>
-<body>
-<header class="top">
-  <a class="brand" href="/">texture</a>
-  <nav>
-    <a href="/" {% if active == "dashboard" %}class="on"{% endif %}>Dashboard</a>
-    <a href="/preflop" {% if active == "preflop" %}class="on"{% endif %}>Preflop</a>
-    <a href="/postflop" {% if active == "postflop" %}class="on"{% endif %}>Postflop</a>
-    <a href="/position" {% if active == "position" %}class="on"{% endif %}>Position</a>
-    <a href="/sessions" {% if active == "sessions" %}class="on"{% endif %}>Sessions</a>
-    <a href="/hands" {% if active == "hands" %}class="on"{% endif %}>Hands</a>
-    <a href="/import" {% if active == "import" %}class="on"{% endif %}>Import</a>
-    <a href="/settings" {% if active == "settings" %}class="on"{% endif %}>Settings</a>
-  </nav>
-  <span class="version" title="statistics definitions follow PokerTracker 4 semantics">v{{ version }}</span>
-</header>
-<main id="content">
-{% include screen %}
-</main>
-<footer>
-  <p>Local-only. Every statistic above carries its definition: hover a name.</p>
-</footer>
 <script src="/static/uPlot.iife.min.js" defer></script>
 <script src="/static/app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="/">
+      <span class="brand-glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 2C9 5.7 4 8.6 4 12.4c0 2.4 1.7 4.1 3.8 4.1 1.2 0 2.3-.5 3.2-1.4-.2 1.9-.9 3.6-2 5.4h6c-1.1-1.8-1.8-3.5-2-5.4.9.9 2 1.4 3.2 1.4 2.1 0 3.8-1.7 3.8-4.1C20 8.6 15 5.7 12 2Z"/></svg>
+      </span>
+      <span class="brand-text">
+        <span class="brand-name">texture</span>
+        <span class="brand-note">NLHE cash tracker</span>
+      </span>
+    </a>
+
+    <nav class="nav" aria-label="Primary">
+      <div class="nav-group">
+        <p class="nav-label">Overview</p>
+        <a class="nav-link{% if active == "dashboard" %} on{% endif %}" href="/">Dashboard</a>
+        <a class="nav-link{% if active == "sessions" %} on{% endif %}" href="/sessions">Sessions</a>
+      </div>
+      <div class="nav-group">
+        <p class="nav-label">Analysis</p>
+        <a class="nav-link{% if active == "preflop" %} on{% endif %}" href="/preflop">Preflop</a>
+        <a class="nav-link{% if active == "postflop" %} on{% endif %}" href="/postflop">Postflop</a>
+        <a class="nav-link{% if active == "position" %} on{% endif %}" href="/position">Position</a>
+        <a class="nav-link{% if active == "hands" %} on{% endif %}" href="/hands">Hands</a>
+      </div>
+      <div class="nav-group">
+        <p class="nav-label">Data</p>
+        <a class="nav-link{% if active == "import" %} on{% endif %}" href="/import">Import</a>
+        <a class="nav-link{% if active == "settings" %} on{% endif %}" href="/settings">Settings</a>
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span>Local only</span>
+      <span class="dot-sep">·</span>
+      <span>v{{ version }}</span>
+    </div>
+  </aside>
+
+  <div class="page">
+    <main id="content">
+      {% include screen %}
+    </main>
+    <footer class="foot">
+      <span>Self-hosted · your hands stay on this machine.</span>
+      <span class="muted">Hover a statistic name for its definition.</span>
+    </footer>
+  </div>
+</div>
 </body>
 </html>

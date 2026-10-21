@@ -5,6 +5,7 @@
 use crate::domain::{
     ActionKind, Currency, FilterSpec, GroupBy, HeroProfile, Position, Session, Street,
 };
+use crate::importer;
 use crate::money::Money;
 use crate::storage::Db;
 use crate::parser::{self, HandParser};
@@ -14,7 +15,7 @@ use crate::storage::queries as q;
 use crate::web::defs;
 use crate::web::filters::{group_param, FilterView};
 use crate::web::render::env;
-use axum::extract::{Path, RawQuery, State};
+use axum::extract::{Multipart, Path, RawQuery, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use serde::Serialize;
@@ -117,6 +118,7 @@ struct FilterBar {
     positions: Vec<String>,
     sessions: Vec<String>,
     profiles: Vec<String>,
+    group: Option<String>,
     active: bool,
     chips: Vec<ChipItem>,
     #[serde(rename = "stakeOptions")]
@@ -187,6 +189,7 @@ impl FilterBar {
             positions: fv.positions.clone(),
             sessions: fv.sessions.clone(),
             profiles: fv.profiles.clone(),
+            group: fv.group.clone(),
             active: !fv.is_empty(),
             chips,
             stake_options,
@@ -218,6 +221,10 @@ struct Summary {
     luck_kind: &'static str,
     showdown: String,
     non_showdown: String,
+    /// Absolute contribution of each side to the showdown split, as a
+    /// percentage of the two absolute values combined (display only).
+    showdown_share: String,
+    non_showdown_share: String,
     rake: String,
     rake_bb: Option<String>,
 }
@@ -306,6 +313,15 @@ struct PageLinks {
 fn summary_from(row: q::AggregateRow, stake_bb: Option<f64>) -> Summary {
     let luck_positive = row.luck_delta_minor > 0;
     let luck_zero = row.luck_delta_minor == 0;
+    let split_abs = (row.sd_winnings_minor as i128).abs()
+        + (row.non_sd_winnings_minor as i128).abs();
+    let share = |v: i64| {
+        if split_abs == 0 {
+            0.0
+        } else {
+            (v as i128).abs() as f64 / split_abs as f64 * 100.0
+        }
+    };
     Summary {
         has_data: row.hands > 0,
         hands: row.hands,
@@ -337,6 +353,8 @@ fn summary_from(row: q::AggregateRow, stake_bb: Option<f64>) -> Summary {
         },
         showdown: money_of(row.sd_winnings_minor),
         non_showdown: money_of(row.non_sd_winnings_minor),
+        showdown_share: format!("{:.1}", share(row.sd_winnings_minor)),
+        non_showdown_share: format!("{:.1}", share(row.non_sd_winnings_minor)),
         rake: money_of(row.rake_attributed_minor),
         // Rake in big blinds is Σ rake_i / bb_i; `AggregateRow` does not carry
         // the per-hand normalization, so it is rebuilt from the stake-grouped
@@ -1108,20 +1126,135 @@ struct QuarantineView {
     retries: i64,
 }
 
-fn excerpt(raw: &str, max: usize) -> String {
-    let flat: String = raw.chars().map(|c| if c.is_whitespace() { ' ' } else { c }).collect();
-    let flat = flat.trim();
-    if flat.chars().count() <= max {
-        flat.to_string()
+/// Largest request body accepted for a browser upload. A decade of PokerStars
+/// hand histories is a few tens of megabytes; this accepts a full archive while
+/// keeping a stray huge body from exhausting memory.
+pub const MAX_UPLOAD_BYTES: usize = 64 * 1024 * 1024;
+
+#[derive(Serialize, Default)]
+struct UploadSourceView {
+    name: String,
+    hands_imported: u64,
+    duplicates: u64,
+    failures: u64,
+    quarantined: u64,
+    incomplete: bool,
+    error: Option<String>,
+}
+
+/// The summary rendered on the import screen after a POST /import/upload.
+#[derive(Serialize, Default)]
+struct UploadView {
+    sources: Vec<UploadSourceView>,
+    hands_seen: u64,
+    hands_imported: u64,
+    duplicates: u64,
+    failures: u64,
+    quarantined: u64,
+    incomplete: u64,
+    /// Sources that could not be read/imported at all (storage-level errors).
+    errors: u64,
+    duration_ms: u128,
+    /// The hero registered from this upload on a first run, if any.
+    hero: Option<String>,
+    /// True when no active hero profile could be resolved; statistics would be
+    /// empty until one is configured.
+    no_hero: bool,
+    error: Option<String>,
+}
+
+fn sanitize_upload_name(raw: &str) -> String {
+    let base = raw.rsplit(|c| c == '/' || c == '\\').next().unwrap_or(raw);
+    let cleaned: String = base.chars().filter(|c| !c.is_control()).take(120).collect();
+    let cleaned = cleaned.trim();
+    if cleaned.is_empty() {
+        "upload.txt".to_string()
     } else {
-        let cut: String = flat.chars().take(max).collect();
-        format!("{cut}…")
+        cleaned.to_string()
     }
 }
 
-pub async fn import_screen(
-    State(st): State<AppState>,
-    headers: HeaderMap,
+/// Import every uploaded/pasted document, attributing each hand to its source
+/// label. Returns a summary for the import screen. Dedupe happens inside
+/// `importer::import_text` (keyed on the PokerStars hand id), so uploading the
+/// same history twice reports duplicates instead of inserting rows.
+fn upload_blobs(
+    db: &Db,
+    configured_hero: Option<String>,
+    blobs: Vec<(String, String)>,
+) -> anyhow::Result<UploadView> {
+    // An upload is often the first thing a fresh installation sees. Resolve the
+    // hero from `Dealt to` lines before importing so the hands get analysis rows
+    // immediately, exactly as first-run setup does for a watched folder.
+    let mut hero = None;
+    if db.active_profile()?.is_none() {
+        let detected = configured_hero
+            .or_else(|| blobs.iter().find_map(|(_, text)| importer::detect_hero_from_text(text)));
+        if let Some(name) = detected {
+            db.ensure_hero_profile(&name)?;
+            hero = Some(name);
+        }
+    }
+
+    let run_id = hands_store::start_import_run(db, "upload").ok();
+    let opts = importer::ImportOptions { quiet: true, ..Default::default() };
+    let mut view = UploadView { hero, ..Default::default() };
+
+    for (name, text) in blobs {
+        let source = format!("upload:{name}");
+        match importer::import_text(db, &text, &source, &opts, &mut |_| {}) {
+            Ok(out) => {
+                view.hands_seen += out.hands_seen;
+                view.hands_imported += out.hands_imported;
+                view.duplicates += out.duplicates;
+                view.failures += out.failures;
+                view.quarantined += out.quarantined;
+                view.duration_ms += out.duration_ms;
+                if out.incomplete_trailing {
+                    view.incomplete += 1;
+                }
+                view.sources.push(UploadSourceView {
+                    name,
+                    hands_imported: out.hands_imported,
+                    duplicates: out.duplicates,
+                    failures: out.failures,
+                    quarantined: out.quarantined,
+                    incomplete: out.incomplete_trailing,
+                    error: None,
+                });
+            }
+            Err(e) => {
+                tracing::warn!(source = %source, error = %e, "upload import failed");
+                view.errors += 1;
+                view.sources.push(UploadSourceView {
+                    name,
+                    error: Some(e.to_string()),
+                    ..Default::default()
+                });
+            }
+        }
+    }
+
+    if let Some(id) = run_id {
+        let _ = hands_store::finish_import_run(
+            db,
+            id,
+            &hands_store::ImportRunStats {
+                files_seen: view.sources.len() as i64,
+                hands_imported: view.hands_imported as i64,
+                duplicates: view.duplicates as i64,
+                failures: view.failures as i64,
+            },
+        );
+    }
+    view.no_hero = db.active_profile()?.is_none();
+    Ok(view)
+}
+
+fn render_import(
+    st: &AppState,
+    headers: &HeaderMap,
+    upload: Option<UploadView>,
 ) -> WebResult<Response> {
     let snap = st.importer.snapshot();
     let last_run = hands_store::latest_import_run(&st.db)?.map(|(kind, started, hands, dups, fails, finished)| LastRun {
@@ -1164,14 +1297,97 @@ pub async fn import_screen(
     };
 
     let fv = FilterView::parse(None);
-    let bar = FilterBar::build(&st, &fv, "/import", false);
+    let bar = FilterBar::build(st, &fv, "/import", false);
     let mut obj = base_json("Import & quarantine", "/import", "import", "import.html", &bar);
     let obj = obj.as_object_mut().ok_or_else(|| internal("base object"))?;
     obj.insert(
         "import".into(),
         serde_json::to_value(&view).map_err(|e| internal(e))?,
     );
-    Ok(screen_value("import.html", obj.clone(), wants_fragment(&headers)))
+    obj.insert(
+        "upload".into(),
+        serde_json::to_value(&upload).map_err(|e| internal(e))?,
+    );
+    Ok(screen_value("import.html", obj.clone(), wants_fragment(headers)))
+}
+
+pub async fn import_screen(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+) -> WebResult<Response> {
+    render_import(&st, &headers, None)
+}
+
+/// POST /import/upload — accept one or more hand-history files plus optional
+/// pasted text, import every hand that is not already in the database, and
+/// render the same import screen with a summary. Duplicates are identified by
+/// PokerStars hand id, so re-uploading is harmless.
+pub async fn upload_hands(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    mut multipart: Multipart,
+) -> WebResult<Response> {
+    let mut blobs: Vec<(String, String)> = Vec::new();
+    let mut total = 0usize;
+
+    loop {
+        let field = multipart.next_field().await.map_err(|e| {
+            WebError(StatusCode::BAD_REQUEST, format!("invalid upload: {e}"))
+        })?;
+        let Some(field) = field else { break };
+        let field_name = field.name().unwrap_or_default().to_string();
+        if field_name != "files" && field_name != "pasted" {
+            continue;
+        }
+        let filename = field.file_name().map(|s| s.to_string());
+        let bytes = field.bytes().await.map_err(|e| {
+            WebError(StatusCode::BAD_REQUEST, format!("could not read upload: {e}"))
+        })?;
+        total = total.saturating_add(bytes.len());
+        if total > MAX_UPLOAD_BYTES {
+            return Err(WebError(
+                StatusCode::PAYLOAD_TOO_LARGE,
+                format!("upload exceeds the {} MB limit", MAX_UPLOAD_BYTES / (1024 * 1024)),
+            ));
+        }
+        if bytes.iter().all(|b| b.is_ascii_whitespace()) {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&bytes).into_owned();
+        let name = if field_name == "pasted" {
+            "pasted text".to_string()
+        } else {
+            sanitize_upload_name(filename.as_deref().unwrap_or("upload.txt"))
+        };
+        blobs.push((name, text));
+    }
+
+    if blobs.is_empty() {
+        let view = UploadView {
+            error: Some("Choose a hand-history file or paste some hand text first.".into()),
+            ..Default::default()
+        };
+        return render_import(&st, &headers, Some(view));
+    }
+
+    let db = st.db.clone();
+    let configured_hero = st.cfg.hero_name.clone();
+    let view = tokio::task::spawn_blocking(move || upload_blobs(&db, configured_hero, blobs))
+        .await
+        .map_err(|e| internal(format!("upload task failed: {e}")))?
+        .map_err(|e| internal(format!("upload failed: {e}")))?;
+    render_import(&st, &headers, Some(view))
+}
+
+fn excerpt(raw: &str, max: usize) -> String {
+    let flat: String = raw.chars().map(|c| if c.is_whitespace() { ' ' } else { c }).collect();
+    let flat = flat.trim();
+    if flat.chars().count() <= max {
+        flat.to_string()
+    } else {
+        let cut: String = flat.chars().take(max).collect();
+        format!("{cut}…")
+    }
 }
 
 /// POST /import/retry/:id — re-parse one quarantined raw hand with the current

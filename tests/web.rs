@@ -330,3 +330,164 @@ async fn a_session_links_to_its_own_hands() {
         "a session filter must select fewer hands than the unfiltered list"
     );
 }
+
+// ---------------------------------------------------------------------------
+// POST /import/upload — browser hand-history uploads
+// ---------------------------------------------------------------------------
+
+/// Build a multipart/form-data body. `fields` is `(name, filename, text)`;
+/// a `None` filename makes it a plain text field (the paste box).
+fn multipart_body(fields: &[( &str, Option<&str>, &str)]) -> (String, Vec<u8>) {
+    const BOUNDARY: &str = "texture-test-boundary";
+    let mut body = Vec::new();
+    for (name, filename, text) in fields {
+        body.extend_from_slice(format!("--{BOUNDARY}\r\n").as_bytes());
+        match filename {
+            Some(file) => body.extend_from_slice(
+                format!(
+                    "Content-Disposition: form-data; name=\"{name}\"; filename=\"{file}\"\r\n\
+                     Content-Type: text/plain\r\n\r\n"
+                )
+                .as_bytes(),
+            ),
+            None => body.extend_from_slice(
+                format!("Content-Disposition: form-data; name=\"{name}\"\r\n\r\n").as_bytes(),
+            ),
+        }
+        body.extend_from_slice(text.as_bytes());
+        body.extend_from_slice(b"\r\n");
+    }
+    body.extend_from_slice(format!("--{BOUNDARY}--\r\n").as_bytes());
+    (format!("multipart/form-data; boundary={BOUNDARY}"), body)
+}
+
+async fn upload(state: &AppState, fields: &[(&str, Option<&str>, &str)]) -> (StatusCode, String) {
+    let (content_type, body) = multipart_body(fields);
+    let app = web::router(state.clone());
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/import/upload")
+                .header("content-type", content_type)
+                .body(Body::from(body))
+                .expect("upload request"),
+        )
+        .await
+        .expect("router responds");
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 8 * 1024 * 1024)
+        .await
+        .expect("body");
+    (status, String::from_utf8_lossy(&bytes).to_string())
+}
+
+fn db_hand_count(db: &Db) -> i64 {
+    db.with_reader(|c| c.query_row("SELECT COUNT(*) FROM hands", [], |r| r.get(0)))
+        .expect("count hands")
+}
+
+#[tokio::test]
+async fn upload_imports_new_hands_once_and_reports_duplicates() {
+    let env = populated();
+    let before = db_hand_count(&env.db);
+    let text = format!(
+        "{}\n{}",
+        walk_hand(3000, "hero", 10),
+        walk_hand(3001, "hero", 11)
+    );
+
+    let (status, body) =
+        upload(&env.state, &[("files", Some("session.txt"), text.as_str())]).await;
+    assert_eq!(status, StatusCode::OK, "upload should render the import screen: {body}");
+    assert!(body.contains("2 new hands added"), "the new-hand summary must be shown: {body}");
+    assert!(body.contains("session.txt"), "the source must be named");
+    assert_eq!(db_hand_count(&env.db), before + 2);
+
+    let (status, body) =
+        upload(&env.state, &[("files", Some("session.txt"), text.as_str())]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.contains("Nothing new") && body.contains("already here"),
+        "a re-upload must report duplicates rather than inserting rows: {body}"
+    );
+    assert_eq!(db_hand_count(&env.db), before + 2, "the hand table must not grow");
+}
+
+#[tokio::test]
+async fn upload_accepts_pasted_text_and_reports_parse_failures() {
+    let env = populated();
+    let before = db_hand_count(&env.db);
+    let text = format!(
+        "{}\nPokerStars Hand #9998: not a real hand\n*** SUMMARY ***\nTotal pot €0.00\n",
+        walk_hand(3002, "hero", 12)
+    );
+
+    let (status, body) = upload(&env.state, &[("pasted", None, text.as_str())]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains("pasted text"), "the paste source must be named: {body}");
+    assert!(body.contains("1 new hand added"), "the good hand must land: {body}");
+    assert!(body.contains("Quarantined"), "the failure count must be surfaced: {body}");
+    assert_eq!(db_hand_count(&env.db), before + 1);
+    assert_eq!(
+        storage::hands::quarantine_count(&env.db).expect("quarantine count"),
+        1,
+        "a malformed uploaded hand must be quarantined, never dropped"
+    );
+}
+
+#[tokio::test]
+async fn a_first_upload_registers_the_hero_from_the_hands() {
+    let env = empty();
+    assert!(env.db.active_profile().expect("profile lookup").is_none());
+
+    let text = format!("{}\n{}", walk_hand(4000, "hero", 2), walk_hand(4001, "hero", 3));
+    let (status, body) =
+        upload(&env.state, &[("files", Some("HH.txt"), text.as_str())]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.contains("Registered") && body.contains("hero"),
+        "the upload must resolve the hero without a settings visit: {body}"
+    );
+
+    let profile = env.db.active_profile().expect("profile lookup").expect("a hero exists");
+    assert_eq!(profile.name, "default");
+    let analyses: i64 = env
+        .db
+        .with_reader(|c| c.query_row("SELECT COUNT(*) FROM hero_hands", [], |r| r.get(0)))
+        .expect("count hero hands");
+    assert_eq!(analyses, 2, "first-upload hands must be attributed to the detected hero");
+}
+
+#[tokio::test]
+async fn an_empty_upload_is_a_validation_error_not_a_crash() {
+    let env = empty();
+    let (status, body) = upload(&env.state, &[("files", Some("empty.txt"), "   \n\n")]).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        body.contains("Choose a hand-history file") || body.contains("No complete hands found"),
+        "an empty upload should explain itself: {body}"
+    );
+    assert_eq!(db_hand_count(&env.db), 0);
+}
+
+#[tokio::test]
+async fn the_filter_form_uses_the_parameter_names_the_parser_reads() {
+    let env = populated();
+    let (_, body) = get(&env.state, "/hands").await;
+    assert!(body.contains("name=\"stake\""), "the stake selector must post `stake`");
+    assert!(body.contains("name=\"pos\""), "the position selector must post `pos`");
+    assert!(
+        !body.contains("name=\"stakes\""),
+        "`stakes` is not a query parameter the parser understands"
+    );
+
+    // The fixture hands are €0.25/€0.50, so this stake selects them and a
+    // different stake selects nothing. This is the regression the old form's
+    // mismatched parameter name hid.
+    let (_, matching) = get(&env.state, "/hands?stake=25-50").await;
+    assert!(matching.contains("2024-01-02"), "the matching stake must select the hands");
+    let (_, other) = get(&env.state, "/hands?stake=9999-9999").await;
+    assert!(!other.contains("2024-01-02"), "a different stake must select nothing");
+    assert!(other.contains("Clear all"), "the stake filter must be visible as a chip");
+}

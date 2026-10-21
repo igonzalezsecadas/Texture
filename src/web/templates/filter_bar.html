@@ -1,12 +1,28 @@
 {# The filter bar appears on every report screen. Its active state is always
    visible: either the applied chips, or an explicit "lifetime totals" notice. #}
-<form class="filter" method="get" action="{{ filter.path }}"
+<form class="filter card" method="get" action="{{ filter.path }}"
       hx-get="{{ filter.path }}" hx-target="#content" hx-swap="innerHTML" hx-push-url="true">
+  <div class="filter-top">
+    <div class="filter-heading">
+      <p class="eyebrow">Context</p>
+      <strong>Filters</strong>
+    </div>
+    <p class="filter-state">
+      {% if filter.active %}
+        <span class="status-dot live" aria-hidden="true"></span>
+        <span>Filtered view</span>
+      {% else %}
+        <span class="status-dot" aria-hidden="true"></span>
+        <span class="muted">No filters applied &mdash; these are lifetime totals.</span>
+      {% endif %}
+    </p>
+  </div>
+
   <div class="filter-row">
     <label>From <input type="date" name="from" value="{{ filter.from }}"></label>
     <label>To <input type="date" name="to" value="{{ filter.to }}"></label>
     <label>Stakes
-      <select name="stakes">
+      <select name="stake">
         <option value="">any</option>
         {% for o in filter.stakeOptions %}
         <option value="{{ o.value }}" {% if o.selected %}selected{% endif %}>{{ o.label }}</option>
@@ -22,7 +38,7 @@
       </select>
     </label>
     <label>Position
-      <select name="position">
+      <select name="pos">
         <option value="">any</option>
         {% for o in filter.positionOptions %}
         <option value="{{ o.value }}" {% if o.selected %}selected{% endif %}>{{ o.label }}</option>
@@ -38,20 +54,24 @@
       </select>
     </label>
     {% if filter.sessions %}<input type="hidden" name="session" value="{{ filter.sessions|join(',') }}">{% endif %}
-    <button type="submit">Apply</button>
+    {% if filter.group %}<input type="hidden" name="group" value="{{ filter.group }}">{% endif %}
+    <button class="btn primary filter-apply" type="submit">Apply</button>
   </div>
+
+  {% if filter.active %}
+  <div class="active-filters">
+    {% for c in filter.chips %}
+      <span class="chip">{{ c.label }}
+        <a href="{{ c.removeUrl }}" hx-get="{{ c.removeUrl }}" hx-target="#content"
+           hx-push-url="true" title="remove this filter"
+           aria-label="Remove the {{ c.label }} filter">&times;</a></span>
+    {% endfor %}
+    <a class="clear" href="{{ filter.path }}" hx-get="{{ filter.path }}"
+       hx-target="#content" hx-push-url="true">Clear all</a>
+  </div>
+  {% else %}
+  <div class="active-filters active-filters-empty">
+    <span>All hands &middot; all stakes &middot; all positions</span>
+  </div>
+  {% endif %}
 </form>
-<div class="active-filters">
-{% if filter.active %}
-  <strong>Filters:</strong>
-  {% for c in filter.chips %}
-    <span class="chip">{{ c.label }}
-      <a href="{{ c.removeUrl }}" hx-get="{{ c.removeUrl }}" hx-target="#content"
-         hx-push-url="true" title="remove this filter">&times;</a></span>
-  {% endfor %}
-  <a class="clear" href="{{ filter.path }}" hx-get="{{ filter.path }}"
-     hx-target="#content" hx-push-url="true">Clear all</a>
-{% else %}
-  <strong class="lifetime">No filters applied &mdash; these are lifetime totals.</strong>
-{% endif %}
-</div>

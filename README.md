@@ -5,7 +5,9 @@ one SQLite database, one container. It imports your hand histories
 continuously while you play, computes the full statistic set a serious cash
 player expects (results, BB/100, €/100, all-in EV, rake paid, preflop,
 postflop, positional, sessions), and serves a minimalist browser UI —
-server-rendered HTML with htmx, no JavaScript build step.
+server-rendered HTML with htmx, no JavaScript build step. Hand histories can
+be watched on disk or uploaded directly from the browser; both paths share the
+same parser and the same hand-ID dedupe rule.
 
 It is designed to be *verified*, not trusted: the same hand histories can be
 imported into PokerTracker 4, and a documented reconciliation procedure
@@ -45,9 +47,12 @@ automatically (hand count went 4 → 5 within seconds) while the dashboard kept
 - **Reparse**: `reparse --force` rebuilt all 5 hands from the retained raw text in
   ~0.6 s, and the reports were unchanged afterwards — the compatibility
   guarantee that raw text is the source of truth.
+- **Upload**: dropping a hand-history file on the import screen added only the
+  hands that were not already stored; re-uploading the same file reported
+  duplicates and changed nothing.
 - **Shutdown**: `SIGTERM` stopped the process cleanly.
 
-All of this is also covered by the test suite (`cargo test`, 115 tests), which
+All of this is also covered by the test suite (`cargo test`, 131 tests), which
 runs the real parser, the real storage layer and the real router against
 throwaway databases.
 
@@ -111,6 +116,30 @@ mkdir -p hands data
 # UI: http://127.0.0.1:8080 (default bind is 127.0.0.1:8080)
 ```
 
+## Web UI
+
+The interface is server-rendered and works with JavaScript disabled. It uses a
+warm light theme with a matching dark theme driven by the OS preference, a
+sidebar for the report sections, and no client-side state beyond the chart.
+
+- **Dashboard** — total won, hands, BB/100, €/100, cumulative winnings with the
+  all-in adjusted line, luck delta, showdown split, and rake paid.
+- **Preflop / Postflop / Position** — the full statistic set, each name carrying
+  its definition from `docs/stat-definitions.md` on hover.
+- **Sessions** — sessions derived from the UTC idle gap, with a link into the
+  hand browser for exactly that session.
+- **Hands** — filterable hand list with CSV export; each hand opens a parsed
+  view beside the original raw text.
+- **Import** — upload one or more PokerStars `.txt` histories or paste hand
+text. Hands already present are recognised by PokerStars hand ID and skipped,
+  so repeated uploads are safe. Every upload is also recorded as an import run
+  and any unparseable hand is quarantined with its reason.
+- **Settings** — hero profiles and aliases, the session idle gap, and a manual
+  snapshot trigger.
+
+The filter bar is on every report screen; the active set is always visible as
+removable chips, and “Clear all” returns to lifetime totals.
+
 ## Environment variable reference
 
 Every `TEXTURE_*` variable read by the application (`src/config.rs`), with
@@ -124,7 +153,7 @@ defaults:
 | `TEXTURE_BIND_ADDR` | `127.0.0.1:8080` | Address the web UI binds to. Inside Docker this **must** be `0.0.0.0:8080` for the port mapping to work (compose.yaml sets it); the host-side loopback restriction comes from the port publish, not this variable. |
 | `TEXTURE_SNAPSHOT_INTERVAL_SECS` | `21600` (6 h) | Seconds between automatic snapshots while `serve` runs. `0` disables automatic snapshots. |
 | `TEXTURE_SNAPSHOT_RETENTION` | `14` | How many snapshots to keep; the oldest are pruned after each snapshot. |
-| `TEXTURE_HERO_NAME` | *(unset)* | Optional override for the hero screen name, bypassing detection from the hand-history folder name. |
+| `TEXTURE_HERO_NAME` | *(unset)* | Optional override for the hero screen name, bypassing detection from the `Dealt to` lines in the hand histories. |
 | `TEXTURE_SCAN_INTERVAL_SECS` | `30` | Filesystem poll fallback interval for the watcher, in seconds. |
 | `TEXTURE_LOG_JSON` | *(off)* | Set to `1` or `true` to emit logs as JSON. |
 
@@ -208,6 +237,19 @@ texture snapshot
    failure reason — decide whether a report is trustworthy from that count.
 4. Run `texture import` a second time to confirm idempotency: it should report
    only duplicates and change nothing.
+
+### Uploading hands from the browser
+
+1. Open the **Import** screen and drop one or more PokerStars `.txt` files on
+   the upload area (or paste hand text into the box).
+2. Submit. The summary reports new hands, duplicates skipped, quarantined hands,
+   and any truncated trailing hand held back. Duplicate detection is by
+   PokerStars hand ID, so uploading the same file again is harmless.
+3. On a fresh installation, the hero is detected from the `Dealt to` lines and
+   registered automatically — the same rule the folder watcher uses.
+
+The upload route is bounded at 64 MB per request. For a very large archive, the
+bulk `texture import` command is still the faster path.
 
 ### Playing live
 
@@ -402,6 +444,10 @@ Do not trust the tracker; verify it.
   tables merge into one session because the gap is time-based. Session
   duration is derived from first/last hand timestamps and is labelled as
   approximate in the UI.
+- **Uploads vs. files** share the parser, hero resolution, quarantine and
+  hand-ID dedupe. An upload is not a watched file, so it does not touch
+  `file_state`; its provenance is recorded as `upload:<filename>` on each hand
+  and on quarantine rows, and the run appears in import history as `upload`.
 - **Snapshots** are `VACUUM INTO` copies with retention — see
   [Backup and restore](#backup-and-restore).
 

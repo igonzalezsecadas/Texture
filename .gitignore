@@ -1,9 +1,76 @@
-target/
-.scratch/**/db/
-*.sqlite
-*.sqlite-*
-.env
+# ---------------------------------------------------------------------------
+# Rust build output
+# ---------------------------------------------------------------------------
+/target/
+*.rs.bk
 
-# Personal hand histories and the local database never belong in the repo.
+# ---------------------------------------------------------------------------
+# Local runtime data — never publish hand histories or the personal database
+# ---------------------------------------------------------------------------
 /hands/
 /data/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.db3
+*.db3-*
+*.bak
+
+# ---------------------------------------------------------------------------
+# Local environment and secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Logs, exports, and transient files
+# ---------------------------------------------------------------------------
+*.log
+/logs/
+*.pid
+*.tmp
+*.orig
+*.rej
+
+# ---------------------------------------------------------------------------
+# Coverage and profiling artifacts
+# ---------------------------------------------------------------------------
+*.profraw
+*.profdata
+lcov.info
+/coverage/
+perf.data*
+
+# ---------------------------------------------------------------------------
+# Editors and operating systems
+# ---------------------------------------------------------------------------
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.iml
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Local compose overrides (compose.yaml itself stays tracked)
+# ---------------------------------------------------------------------------
+compose.override.yaml
+compose.override.yml
+docker-compose.override.yaml
+docker-compose.override.yml
+
+# ---------------------------------------------------------------------------
+# Local issue-tracker databases (the markdown tickets stay tracked)
+# ---------------------------------------------------------------------------
+.scratch/**/db/

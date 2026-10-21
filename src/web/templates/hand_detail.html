@@ -1,44 +1,70 @@
-<p class="crumbs"><a href="/hands">&larr; back to hands</a></p>
-<h1>Hand {{ hand.hand_id }}</h1>
-<p class="muted">{{ hand.table_name }} &middot; {{ hand.stakes }} &middot; {{ hand.table_size }}-max
-  &middot; {{ hand.ts }} ({{ hand.local_ts }} {{ hand.tz_token }})
-  &middot; parser v{{ hand.parser_version }}</p>
+<p class="crumbs"><a href="/hands">&larr; Back to hands</a></p>
+
+<header class="page-head hand-head">
+  <div>
+    <p class="eyebrow">Hand</p>
+    <h1 class="mono">#{{ hand.hand_id }}</h1>
+    <p class="lede">
+      {{ hand.table_name }} &middot; {{ hand.stakes }} &middot; {{ hand.table_size }}-max
+      &middot; {{ hand.ts }} <span class="muted">({{ hand.local_ts }} {{ hand.tz_token }})</span>
+      &middot; parser v{{ hand.parser_version }}
+    </p>
+  </div>
+</header>
+
+<section class="hand-summary card">
+  <div><span class="k">Board</span><span class="v mono">{{ hand.board }}</span></div>
+  <div><span class="k">Pot</span><span class="v">{{ hand.pot }}</span></div>
+  <div><span class="k">Rake</span><span class="v">{{ hand.rake }}</span></div>
+  <div><span class="k">Showdown</span><span class="v">{{ "yes" if hand.went_to_showdown else "no" }}</span></div>
+</section>
+
 <div class="split">
-  <section class="parsed">
-    <h2>Parsed</h2>
-    <p><strong>Board:</strong> {{ hand.board }}</p>
-    <p><strong>Pot:</strong> {{ hand.pot }} &middot; <strong>Rake:</strong> {{ hand.rake }}
-      &middot; showdown: {{ "yes" if hand.went_to_showdown else "no" }}</p>
-    <table class="stats">
-      <thead><tr><th>Seat</th><th>Player</th><th>Stack</th><th>Pos</th><th>Put in</th><th>Result</th><th>Cards</th></tr></thead>
-      <tbody>
-      {% for s in hand.seats %}
-        <tr>
-          <td>{{ s.seat }}</td><td>{{ s.name }}</td><td>{{ s.stack }}</td><td>{{ s.position }}</td>
-          <td>{{ s.contributed }}</td>
-          <td class="{% if s.positive %}pos{% else %}neg{% endif %}">{{ s.result }}</td>
-          <td>{{ s.cards }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    <h2>Actions</h2>
+  <section class="card">
+    <div class="card-head">
+      <div><p class="eyebrow">Parse</p><h2>Parsed</h2></div>
+    </div>
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr><th>Seat</th><th>Player</th><th class="num">Stack</th><th>Pos</th><th class="num">Put in</th><th class="num">Result</th><th>Cards</th></tr></thead>
+        <tbody>
+        {% for s in hand.seats %}
+          <tr>
+            <td class="muted">{{ s.seat }}</td>
+            <td class="row-title">{{ s.name }}</td>
+            <td class="num">{{ s.stack }}</td>
+            <td>{{ s.position }}</td>
+            <td class="num">{{ s.contributed }}</td>
+            <td class="num {% if s.positive %}pos{% else %}neg{% endif %}">{{ s.result }}</td>
+            <td class="mono">{{ s.cards }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="section-title">Actions</h3>
     {% if hand.actionsAvailable %}
-    <table class="stats">
-      <thead><tr><th>Street</th><th>Player</th><th>Action</th><th>Amount</th></tr></thead>
-      <tbody>
-      {% for a in hand.actions %}
-        <tr><td>{{ a.street }}</td><td>{{ a.who }}</td><td>{{ a.kind }}</td><td>{{ a.amount }}</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-wrap actions-wrap">
+      <table class="data compact">
+        <thead><tr><th>Street</th><th>Player</th><th>Action</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        {% for a in hand.actions %}
+          <tr><td class="muted">{{ a.street }}</td><td>{{ a.who }}</td><td>{{ a.kind }}</td><td class="num">{{ a.amount }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
     <p class="muted">{{ hand.actionsNote }}</p>
     {% endif %}
   </section>
-  <section class="raw">
-    <h2>Original hand text</h2>
-    <p class="muted">The source of truth. Anything above can be rebuilt from this.</p>
-    <pre>{{ hand.raw }}</pre>
+
+  <section class="card raw-card">
+    <div class="card-head">
+      <div><p class="eyebrow">Source of truth</p><h2>Original hand text</h2></div>
+    </div>
+    <p class="muted raw-note">Anything in the parsed panel can be rebuilt from this text.</p>
+    <pre class="raw">{{ hand.raw }}</pre>
   </section>
 </div>

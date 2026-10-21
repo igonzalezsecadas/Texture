@@ -1,22 +1,44 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Overview</p>
+    <h1>Sessions</h1>
+    <p class="lede">Play sessions derived from hand timestamps. Simultaneous tables merge into one session.</p>
+  </div>
+</header>
+
 {% include "filter_bar.html" %}
-<h1>Sessions</h1>
-<p class="muted">A session starts after an idle gap in UTC, so simultaneous tables
-merge into one session. {{ notice }}
-Durations are derived from hand timestamps and are approximate.</p>
-<table class="stats">
-  <thead><tr><th>#</th><th>Start</th><th>End</th><th>Duration (approx.)</th><th>Hands</th><th>Result</th><th></th></tr></thead>
-  <tbody>
-  {% for r in rows %}
-    <tr>
-      <td><a href="{{ r.url }}">{{ r.id }}</a></td>
-      <td>{{ r.start }}</td>
-      <td>{{ r.end }}</td>
-      <td>{{ r.duration }}</td>
-      <td>{{ r.hands }}</td>
-      <td class="{% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
-      <td><a href="{{ r.url }}">review hands</a></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% if not rows %}<p class="empty">No sessions match these filters.</p>{% endif %}
+
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+
+<div class="card table-card">
+  <div class="table-wrap">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>#</th><th>Start</th><th>End</th><th>Duration <span class="muted">(approx.)</span></th>
+          <th class="num">Hands</th><th class="num">Result</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <th scope="row" class="row-title"><a href="{{ r.url }}">{{ r.id }}</a></th>
+          <td>{{ r.start }}</td>
+          <td>{{ r.end }}</td>
+          <td>{{ r.duration }}</td>
+          <td class="num">{{ r.hands }}</td>
+          <td class="num {% if r.positive %}pos{% else %}neg{% endif %}">{{ r.net }}</td>
+          <td class="cell-action"><a class="link-quiet" href="{{ r.url }}">review hands</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if not rows %}<p class="empty-note">No sessions match these filters.</p>{% endif %}
+
+<p class="footnote">
+  A session begins after an idle gap in UTC ({{ gapMinutes }} minutes by default),
+  so daylight saving and travel cannot corrupt the grouping. Durations are
+  derived from first and last hand timestamps and are approximate.
+</p>

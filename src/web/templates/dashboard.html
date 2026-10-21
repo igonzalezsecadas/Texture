@@ -1,28 +1,105 @@
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Overview</p>
+    <h1>Dashboard</h1>
+    <p class="lede">Results, variance, and where the money actually came from.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn ghost" href="/import#upload">Upload hands</a>
+  </div>
+</header>
+
 {% include "filter_bar.html" %}
-<h1>Dashboard</h1>
+
 {% if summary.has_data %}
-<section class="cards">
-  <div class="card"><span class="k">Hands</span><span class="v">{{ summary.hands }}</span></div>
-  <div class="card"><span class="k">Total won</span><span class="v {% if summary.positive %}pos{% else %}neg{% endif %}">{{ summary.net }}</span></div>
-  <div class="card"><span class="k">BB/100</span><span class="v">{{ summary.bb_per_100 }}</span></div>
-  <div class="card"><span class="k">&euro;/100</span><span class="v">{{ summary.currency_per_100 }}</span></div>
-  <div class="card"><span class="k">All-in adjusted</span><span class="v">{{ summary.adjusted }}</span></div>
-  <div class="card"><span class="k">Luck delta</span><span class="v {{ summary.luck_kind }}">{{ summary.luck }}</span></div>
-  <div class="card"><span class="k">Showdown winnings</span><span class="v">{{ summary.showdown }}</span></div>
-  <div class="card"><span class="k">Non-showdown winnings</span><span class="v">{{ summary.non_showdown }}</span></div>
-  <div class="card"><span class="k">Rake paid</span><span class="v">{{ summary.rake }}{% if summary.rake_bb %} <span class="muted">({{ summary.rake_bb }} BB)</span>{% endif %}</span></div>
+<section class="hero card">
+  <div class="hero-main">
+    <p class="eyebrow">Total won</p>
+    <p class="hero-value {% if summary.positive %}pos{% else %}neg{% endif %}">{{ summary.net }}</p>
+    <p class="hero-note">over <strong>{{ summary.hands }}</strong> hands</p>
+  </div>
+  <dl class="hero-facts">
+    <div><dt>Hands</dt><dd>{{ summary.hands }}</dd></div>
+    <div><dt>BB/100</dt><dd>{{ summary.bb_per_100 }}</dd></div>
+    <div><dt>&euro;/100</dt><dd>{{ summary.currency_per_100 }}</dd></div>
+  </dl>
 </section>
+
 {% if hasChart %}
-<figure class="chart">
-  <div id="chart"></div>
-  <figcaption>Cumulative winnings, with the all-in adjusted line.
-    {{ summary.hands }} hands, downsampled server-side to a bounded payload.</figcaption>
-</figure>
-<script id="chart-data" type="application/json">{{ chartJson|safe }}</script>
+<section class="card chart-card">
+  <div class="card-head">
+    <div>
+      <p class="eyebrow">Cumulative</p>
+      <h2>Winnings over time</h2>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <span class="legend-item"><span class="key net"></span>Winnings</span>
+      <span class="legend-item"><span class="key ev"></span>All-in adjusted</span>
+    </div>
+  </div>
+  <figure class="chart">
+    <div id="chart"></div>
+    <figcaption>
+      {{ summary.hands }} hands, downsampled server-side to a bounded payload.
+      The dashed line is the result with all-in pots valued at their equity.
+    </figcaption>
+  </figure>
+  <script id="chart-data" type="application/json">{{ chartJson|safe }}</script>
+</section>
 {% else %}
-<p class="empty">Not enough hands to draw a graph for these filters.</p>
+<p class="empty-note">Not enough hands to draw a graph for this filter set.</p>
 {% endif %}
+
+<section class="insight-grid">
+  <article class="card insight">
+    <p class="eyebrow">Variance</p>
+    <h2>All-in adjusted</h2>
+    <p class="insight-value">{{ summary.adjusted }}</p>
+    <p class="insight-delta {{ summary.luck_kind }}">
+      <span class="delta-label">Luck delta</span>
+      <strong>{{ summary.luck }}</strong>
+    </p>
+    <p class="insight-note">Actual minus adjusted, at the point of all-in with cards known.</p>
+  </article>
+
+  <article class="card insight">
+    <p class="eyebrow">Composition</p>
+    <h2>Showdown split</h2>
+    <div class="split-bar" role="img"
+         aria-label="Showdown {{ summary.showdown }}, non-showdown {{ summary.non_showdown }}">
+      <span class="split-sd" style="width: {{ summary.showdown_share }}%"></span>
+      <span class="split-nsd" style="width: {{ summary.non_showdown_share }}%"></span>
+    </div>
+    <dl class="mini-facts">
+      <div><dt><span class="dot sd"></span>Showdown</dt><dd>{{ summary.showdown }}</dd></div>
+      <div><dt><span class="dot nsd"></span>Non-showdown</dt><dd>{{ summary.non_showdown }}</dd></div>
+    </dl>
+    <p class="insight-note">Bars show each side's share of absolute winnings.</p>
+  </article>
+
+  <article class="card insight">
+    <p class="eyebrow">Cost</p>
+    <h2>Rake paid</h2>
+    <p class="insight-value">{{ summary.rake }}</p>
+    {% if summary.rake_bb %}
+    <p class="insight-delta"><span class="delta-label">in big blinds</span><strong>{{ summary.rake_bb }}</strong></p>
+    {% endif %}
+    <p class="insight-note">Attributed per player by weighted contribution, never split evenly.</p>
+  </article>
+</section>
+
 {% else %}
-<p class="empty">No hands match these filters. Import a hand-history folder from the
-<a href="/import">import screen</a>.</p>
+<section class="empty-state">
+  <p class="eyebrow">Nothing here yet</p>
+  <h2>{% if filter.active %}No hands match these filters{% else %}Your tracker is empty{% endif %}</h2>
+  <p class="lede">
+    {% if filter.active %}
+      Widen the date range or <a href="/">clear the filters</a> to see the full history.
+    {% else %}
+      Upload PokerStars hand histories to get results, EV, preflop, postflop,
+      positional, and session reports.
+    {% endif %}
+  </p>
+  <p><a class="btn primary" href="/import#upload">Upload hand histories</a></p>
+</section>
 {% endif %}

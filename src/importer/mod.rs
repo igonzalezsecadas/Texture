@@ -42,6 +42,21 @@ pub struct ImportOutcome {
     pub duration_ms: u128,
 }
 
+/// Outcome of importing an in-memory hand-history document (a browser upload
+/// or a paste). `hands_seen` counts the complete hands found in the text.
+#[derive(Debug, Clone, Default)]
+pub struct TextImportOutcome {
+    pub hands_seen: u64,
+    pub hands_imported: u64,
+    pub duplicates: u64,
+    pub failures: u64,
+    pub quarantined: u64,
+    /// True when the text ends with a hand that has no summary section yet
+    /// (e.g. a truncated upload). Such a hand is NOT quarantined.
+    pub incomplete_trailing: bool,
+    pub duration_ms: u128,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ImportOptions {
     /// Force a re-read of files already in `file_state`.
@@ -224,6 +239,105 @@ pub fn import_file(
         progress(&snap);
     }
     Ok(acc.into_outcome(t0.elapsed().as_millis()))
+}
+
+/// Import hands from in-memory text. `source` is the provenance label recorded
+/// on each hand (and on quarantine rows), for example `upload:HH20240101.txt`.
+/// Dedupe is by PokerStars hand id, so importing the same text twice inserts
+/// nothing the second time. This deliberately does not touch `file_state` or
+/// `import_runs`: a UI upload is not a watched file.
+pub fn import_text(
+    db: &Db,
+    text: &str,
+    source: &str,
+    opts: &ImportOptions,
+    progress: &mut dyn FnMut(&ImportProgress),
+) -> anyhow::Result<TextImportOutcome> {
+    let t0 = Instant::now();
+    let body = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let (raw_hands, consumed) = parser::split_complete_hands(body);
+    let incomplete_trailing = consumed < body.len() && !body[consumed..].trim().is_empty();
+
+    let mut acc = Acc {
+        files_seen: 1,
+        files_total: 1,
+        current_file: Some(source.to_string()),
+        ..Acc::default()
+    };
+    let hero = hero_ctx(db);
+    let parser_impl = parser::default_parser();
+    acc.report(opts, progress);
+
+    let mut done_in_doc: u64 = 0;
+    for raw in &raw_hands {
+        match parser_impl.parse_hand(raw) {
+            Ok(parsed) => {
+                let analysis = hero_analysis(&parsed, &hero);
+                match store::upsert_hand(db, &parsed, analysis.as_ref(), raw, source) {
+                    Ok(store::UpsertOutcome::Inserted) => acc.hands_imported += 1,
+                    Ok(store::UpsertOutcome::Duplicate) => acc.duplicates += 1,
+                    Err(e) => {
+                        tracing::warn!(source, error = %e, "could not store uploaded hand");
+                        acc.failures += 1;
+                    }
+                }
+            }
+            Err(e) => {
+                let reason = e.to_string();
+                if let Err(qe) = store::quarantine(db, source, raw, &reason, schema::PARSER_VERSION)
+                {
+                    tracing::warn!(source, error = %qe, "quarantine write failed");
+                }
+                acc.failures += 1;
+                acc.quarantined += 1;
+            }
+        }
+        done_in_doc += 1;
+        if done_in_doc.is_multiple_of(64) {
+            acc.report(opts, progress);
+        }
+    }
+
+    acc.files_done = 1;
+    acc.current_file = None;
+    if !opts.quiet {
+        let mut snap = acc.snapshot();
+        snap.finished = true;
+        progress(&snap);
+    }
+
+    Ok(TextImportOutcome {
+        hands_seen: raw_hands.len() as u64,
+        hands_imported: acc.hands_imported,
+        duplicates: acc.duplicates,
+        failures: acc.failures,
+        quarantined: acc.quarantined,
+        incomplete_trailing,
+        duration_ms: t0.elapsed().as_millis(),
+    })
+}
+
+/// Most frequently dealt-to screen name in a hand-history document.
+///
+/// PokerStars writes `Dealt to <screen name> [cards]` only for the owner of the
+/// hand history, so the name that occurs there repeatedly is the hero. Returns
+/// `None` when the text carries no such line. Ties break lexicographically, so
+/// the answer is deterministic.
+pub fn detect_hero_from_text(text: &str) -> Option<String> {
+    let mut counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
+    for line in text.lines() {
+        let Some(rest) = line.trim().strip_prefix("Dealt to ") else { continue };
+        let Some((name, _)) = rest.split_once(" [") else { continue };
+        let name = name.trim();
+        if !name.is_empty() {
+            *counts.entry(name.to_string()).or_default() += 1;
+        }
+    }
+    counts
+        .into_iter()
+        .max_by(|a, b| a.1.cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
+        .map(|(name, _)| name)
 }
 
 /// Process a single file that is known to exist. Handles the unchanged fast

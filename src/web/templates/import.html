@@ -1,36 +1,208 @@
-<h1>Import</h1>
-<section class="cards">
-  <div class="card"><span class="k">Status</span><span class="v">{% if import.running %}running ({{ import.kind }}){% elif import.finished %}idle{% else %}idle{% endif %}</span></div>
-  <div class="card"><span class="k">Files</span><span class="v">{{ import.files_done }} / {{ import.files_total }}</span></div>
-  <div class="card"><span class="k">Hands imported</span><span class="v">{{ import.hands_imported }}</span></div>
-  <div class="card"><span class="k">Duplicates</span><span class="v">{{ import.duplicates }}</span></div>
-  <div class="card"><span class="k">Failures</span><span class="v">{{ import.failures }}</span></div>
-  <div class="card"><span class="k">Quarantined</span><span class="v">{{ import.quarantineCount }}</span></div>
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Data</p>
+    <h1>Import</h1>
+    <p class="lede">Add hands by uploading PokerStars text histories, or watch a folder continuously from the container.</p>
+  </div>
+</header>
+
+<section class="card upload-card" id="upload">
+  <div class="card-head">
+    <div>
+      <p class="eyebrow">Add hands</p>
+      <h2>Upload hand histories</h2>
+    </div>
+    <span class="pill">.txt</span>
+  </div>
+
+  <form class="upload-form" method="post" action="/import/upload" enctype="multipart/form-data">
+    <label class="dropzone" for="hand-files">
+      <input id="hand-files" type="file" name="files" accept=".txt,text/plain" multiple>
+      <span class="drop-icon" aria-hidden="true">&uarr;</span>
+      <span class="drop-title">Drop hand-history files here</span>
+      <span class="drop-hint">or click to choose one or more .txt files from PokerStars</span>
+    </label>
+
+    <div class="paste-block">
+      <label for="pasted">Or paste hand text</label>
+      <textarea id="pasted" name="pasted" rows="4" spellcheck="false"
+                placeholder="PokerStars Hand #..."></textarea>
+    </div>
+
+    <div class="upload-actions">
+      <button class="btn primary" type="submit">Import hands</button>
+      <p class="muted">Hands already in the database are recognised by hand ID and skipped, never duplicated.</p>
+    </div>
+  </form>
 </section>
-{% if import.current_file %}<p class="muted">Current file: <code>{{ import.current_file }}</code></p>{% endif %}
-{% if import.last_error %}<p class="error">Last error: {{ import.last_error }}</p>{% endif %}
-{% if import.last_run %}
-<p class="muted">Last run: {{ import.last_run.kind }} started {{ import.last_run.started }},
-  finished {{ import.last_run.finished }}, imported {{ import.last_run.hands_imported }},
-  duplicates {{ import.last_run.duplicates }}, failures {{ import.last_run.failures }}.</p>
+
+{% if upload %}
+<section class="card upload-result{% if upload.error %} bad{% endif %}">
+  <div class="result-head">
+    {% if upload.error %}
+      <span class="result-badge bad" aria-hidden="true">!</span>
+      <div>
+        <p class="eyebrow">Upload</p>
+        <h2>Upload failed</h2>
+        <p class="muted">{{ upload.error }}</p>
+      </div>
+    {% elif upload.hands_imported > 0 %}
+      <span class="result-badge good" aria-hidden="true">&check;</span>
+      <div>
+        <p class="eyebrow">Upload complete</p>
+        <h2>{{ upload.hands_imported }} new hand{% if upload.hands_imported != 1 %}s{% endif %} added</h2>
+        <p class="muted">
+          {{ upload.hands_seen }} complete hand{% if upload.hands_seen != 1 %}s{% endif %} read
+          from {{ upload.sources|length }} source{% if upload.sources|length != 1 %}s{% endif %}
+          in {{ upload.duration_ms }} ms.
+        </p>
+      </div>
+    {% elif upload.duplicates > 0 %}
+      <span class="result-badge neutral" aria-hidden="true">&check;</span>
+      <div>
+        <p class="eyebrow">Upload complete</p>
+        <h2>Nothing new &mdash; those hands are already here</h2>
+        <p class="muted">{{ upload.duplicates }} duplicate{% if upload.duplicates != 1 %}s{% endif %} skipped by hand ID. No rows were changed.</p>
+      </div>
+    {% elif upload.quarantined > 0 %}
+      <span class="result-badge bad" aria-hidden="true">!</span>
+      <div>
+        <p class="eyebrow">Upload complete</p>
+        <h2>No hands could be imported</h2>
+        <p class="muted">{{ upload.quarantined }} hand{% if upload.quarantined != 1 %}s{% endif %} could not be parsed; see the quarantine below.</p>
+      </div>
+    {% elif upload.errors > 0 %}
+      <span class="result-badge bad" aria-hidden="true">!</span>
+      <div>
+        <p class="eyebrow">Upload</p>
+        <h2>Upload finished with errors</h2>
+        <p class="muted">{{ upload.errors }} source{% if upload.errors != 1 %}s{% endif %} could not be imported. The reason is shown per source below.</p>
+      </div>
+    {% else %}
+      <span class="result-badge neutral" aria-hidden="true">&ndash;</span>
+      <div>
+        <p class="eyebrow">Upload complete</p>
+        <h2>No complete hands found</h2>
+        <p class="muted">The text did not contain a hand terminated by a PokerStars summary section.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if not upload.error %}
+  <dl class="result-facts">
+    <div><dt>New hands</dt><dd class="pos">{{ upload.hands_imported }}</dd></div>
+    <div><dt>Duplicates skipped</dt><dd>{{ upload.duplicates }}</dd></div>
+    <div><dt>Quarantined</dt><dd class="{% if upload.quarantined > 0 %}neg{% endif %}">{{ upload.quarantined }}</dd></div>
+    <div><dt>Hands read</dt><dd>{{ upload.hands_seen }}</dd></div>
+  </dl>
+
+  {% if upload.hero %}
+  <p class="notice good">
+    Registered <strong>{{ upload.hero }}</strong> as the hero from the uploaded hands.
+    Screen names can be aliased in <a href="/settings">settings</a>.
+  </p>
+  {% endif %}
+  {% if upload.no_hero %}
+  <p class="notice warn">
+    No hero could be identified, so these hands have no per-hero statistics yet.
+    Set your screen name in <a href="/settings">settings</a>, then run reparse.
+  </p>
+  {% endif %}
+  {% if upload.incomplete > 0 %}
+  <p class="notice warn">
+    {{ upload.incomplete }} file{% if upload.incomplete != 1 %}s{% endif %} ended mid-hand.
+    The trailing incomplete hand was held back rather than quarantined.
+  </p>
+  {% endif %}
+
+  <div class="table-wrap">
+    <table class="data compact">
+      <thead><tr><th>Source</th><th class="num">New</th><th class="num">Duplicates</th><th class="num">Failed</th><th>Note</th></tr></thead>
+      <tbody>
+      {% for s in upload.sources %}
+        <tr>
+          <td class="row-title">{{ s.name }}</td>
+          <td class="num pos">{{ s.hands_imported }}</td>
+          <td class="num">{{ s.duplicates }}</td>
+          <td class="num {% if s.failures > 0 %}neg{% endif %}">{{ s.failures }}</td>
+          <td class="muted">
+            {% if s.error %}<span class="error">{{ s.error }}</span>
+            {% elif s.incomplete %}incomplete tail held back
+            {% else %}&mdash;{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
 {% endif %}
-<h2>Quarantined hands</h2>
-<p class="muted">A hand that cannot be parsed is never silently dropped. Fix the parser,
-then retry the hand here.</p>
-<table class="stats">
-  <thead><tr><th>Hand text</th><th>Reason</th><th>Parser</th><th>First seen</th><th>Last seen</th><th>Retries</th><th></th></tr></thead>
-  <tbody>
-  {% for q in import.quarantine %}
-    <tr>
-      <td><pre class="excerpt">{{ q.excerpt }}</pre></td>
-      <td class="error">{{ q.reason }}</td>
-      <td>v{{ q.parserVersion }}</td>
-      <td>{{ q.first_seen }}</td>
-      <td>{{ q.last_seen }}</td>
-      <td>{{ q.retries }}</td>
-      <td><form method="post" action="/quarantine/{{ q.id }}/retry"><button type="submit">Retry</button></form></td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% if not import.quarantine %}<p class="muted">Nothing quarantined. Every hand parsed cleanly.</p>{% endif %}
+
+<section class="status-section">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Pipeline</p>
+      <h2>Import status</h2>
+    </div>
+    <span class="pill {% if import.running %}live{% endif %}">
+      <span class="status-dot{% if import.running %} live{% endif %}" aria-hidden="true"></span>
+      {% if import.running %}running &middot; {{ import.kind }}{% else %}idle{% endif %}
+    </span>
+  </div>
+
+  <div class="cards">
+    <div class="card stat"><span class="k">Files</span><span class="v">{{ import.files_done }} <span class="muted">/ {{ import.files_total }}</span></span></div>
+    <div class="card stat"><span class="k">Hands imported</span><span class="v">{{ import.hands_imported }}</span></div>
+    <div class="card stat"><span class="k">Duplicates</span><span class="v">{{ import.duplicates }}</span></div>
+    <div class="card stat"><span class="k">Failures</span><span class="v">{{ import.failures }}</span></div>
+    <div class="card stat"><span class="k">Quarantined</span><span class="v">{{ import.quarantineCount }}</span></div>
+  </div>
+  <p class="muted result-line">These counters track the continuous folder watcher. An upload's own counts appear in its summary above.</p>
+
+  {% if import.current_file %}<p class="muted result-line">Current file: <code>{{ import.current_file }}</code></p>{% endif %}
+  {% if import.last_error %}<p class="notice bad">Last error: {{ import.last_error }}</p>{% endif %}
+  {% if import.last_run %}
+  <p class="muted result-line">
+    Last run: {{ import.last_run.kind }} started {{ import.last_run.started }}{% if import.last_run.finished %},
+    finished {{ import.last_run.finished }}{% endif %} &middot; {{ import.last_run.hands_imported }} imported,
+    {{ import.last_run.duplicates }} duplicates, {{ import.last_run.failures }} failures.
+  </p>
+  {% endif %}
+</section>
+
+<section class="quarantine-section">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">Exceptions</p>
+      <h2>Quarantined hands</h2>
+    </div>
+    <span class="pill">{{ import.quarantineCount }}</span>
+  </div>
+  <p class="lede">A hand that cannot be parsed is never silently dropped. Fix the parser, then retry the hand here.</p>
+
+  {% if import.quarantine %}
+  <div class="card table-card">
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr><th>Hand text</th><th>Reason</th><th>Parser</th><th>First seen</th><th>Last seen</th><th class="num">Retries</th><th></th></tr></thead>
+        <tbody>
+        {% for q in import.quarantine %}
+          <tr>
+            <td><pre class="excerpt">{{ q.excerpt }}</pre></td>
+            <td class="error">{{ q.reason }}</td>
+            <td>v{{ q.parserVersion }}</td>
+            <td class="muted">{{ q.first_seen }}</td>
+            <td class="muted">{{ q.last_seen }}</td>
+            <td class="num">{{ q.retries }}</td>
+            <td><form method="post" action="/quarantine/{{ q.id }}/retry"><button class="btn small ghost" type="submit">Retry</button></form></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <p class="empty-note">Nothing quarantined. Every hand parsed cleanly.</p>
+  {% endif %}
+</section>

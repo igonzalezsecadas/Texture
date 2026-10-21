@@ -1,37 +1,76 @@
-<h1>Settings</h1>
-<h2>Hero identity</h2>
-<p class="muted">Every statistic depends on knowing which seat is you. Screen names can be
-aliased into one profile so lifetime results survive a rename.</p>
-<table class="stats">
-  <thead><tr><th>Profile</th><th>Screen names</th><th>Active</th><th></th></tr></thead>
-  <tbody>
-  {% for p in profiles %}
-    <tr>
-      <td>{{ p.name }}</td>
-      <td>{{ p.players|join(", ") }}</td>
-      <td>{% if p.active %}yes{% else %}no{% endif %}</td>
-      <td>
-        {% if not p.active %}<form method="post" action="/settings/profiles/{{ p.id }}/activate"><button type="submit">Make active</button></form>{% endif %}
-        <form method="post" action="/settings/profiles/{{ p.id }}/players">
-          <input type="text" name="screen_name" placeholder="screen name">
-          <button type="submit">Add alias</button>
-        </form>
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
-<form method="post" action="/settings/profiles">
-  <input type="text" name="name" placeholder="new profile name">
-  <button type="submit">Create profile</button>
-</form>
-<h2>Sessions</h2>
-<form method="post" action="/settings/session-gap">
-  <label>Idle gap before a new session, in minutes
-    <input type="number" name="gap_minutes" min="1" value="{{ gapMinutes }}"></label>
-  <button type="submit">Save</button>
-</form>
-<h2>Backups</h2>
-<p class="muted">Snapshots are taken automatically and written to <code>{{ snapshotDir }}</code>.
-Take one now before an upgrade.</p>
-<form method="post" action="/settings/snapshot"><button type="submit">Take a snapshot now</button></form>
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Data</p>
+    <h1>Settings</h1>
+    <p class="lede">Identity, session boundaries, and the backup story. Everything lives in one local SQLite database.</p>
+  </div>
+</header>
+
+<div class="settings-grid">
+  <section class="card settings-card">
+    <div class="card-head">
+      <div><p class="eyebrow">Identity</p><h2>Hero profile</h2></div>
+    </div>
+    <p class="muted">
+      Every statistic depends on knowing which seat is you. Screen names can be
+      aliased into one profile so lifetime results survive a rename.
+    </p>
+
+    <div class="table-wrap">
+      <table class="data compact">
+        <thead><tr><th>Profile</th><th>Screen names</th><th>Active</th><th></th></tr></thead>
+        <tbody>
+        {% for p in profiles %}
+          <tr>
+            <td class="row-title">{{ p.name }}</td>
+            <td>{{ p.players|join(", ") }}</td>
+            <td>{% if p.active %}<span class="pill live"><span class="status-dot live" aria-hidden="true"></span>active</span>{% else %}<span class="muted">inactive</span>{% endif %}</td>
+            <td class="cell-actions">
+              {% if not p.active %}<form method="post" action="/settings/profiles/{{ p.id }}/activate"><button class="btn small ghost" type="submit">Make active</button></form>{% endif %}
+              <form class="inline-form" method="post" action="/settings/profiles/{{ p.id }}/players">
+                <input type="text" name="screen_name" placeholder="screen name" aria-label="Screen name to alias">
+                <button class="btn small ghost" type="submit">Add alias</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <form class="inline-form create-profile" method="post" action="/settings/profiles">
+      <input type="text" name="name" placeholder="new profile name" aria-label="New profile name">
+      <button class="btn primary small" type="submit">Create profile</button>
+    </form>
+  </section>
+
+  <section class="card settings-card">
+    <div class="card-head">
+      <div><p class="eyebrow">Sessions</p><h2>Idle gap</h2></div>
+    </div>
+    <p class="muted">
+      A new session begins after this much idle time. Hands from simultaneous
+      tables share one session. Boundaries are computed in UTC.
+    </p>
+    <form class="inline-form" method="post" action="/settings/session-gap">
+      <label for="gap">Idle gap before a new session, in minutes</label>
+      <div class="inline-controls">
+        <input id="gap" type="number" name="gap_minutes" min="1" value="{{ gapMinutes }}">
+        <button class="btn primary small" type="submit">Save</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card settings-card">
+    <div class="card-head">
+      <div><p class="eyebrow">Safety</p><h2>Backups</h2></div>
+    </div>
+    <p class="muted">
+      Snapshots are taken automatically and written to
+      <code>{{ snapshotDir }}</code>. Take one now before an upgrade.
+    </p>
+    <form method="post" action="/settings/snapshot">
+      <button class="btn primary small" type="submit">Take a snapshot now</button>
+    </form>
+  </section>
+</div>
